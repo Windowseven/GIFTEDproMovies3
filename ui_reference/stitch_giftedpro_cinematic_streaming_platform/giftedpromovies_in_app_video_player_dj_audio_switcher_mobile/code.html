@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="sw"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>GIFTEDproMovies - Player</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=Manrope:wght@400;500;600;700&amp;family=Space+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0d0e12;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-secondary-container": "#5b3800", "surface-tint": "#ffb4aa", "outline": "#af8782", "inverse-on-surface": "#2f3035", "surface-container-low": "#1a1b20", "tertiary-fixed-dim": "#a7c8ff", "primary-fixed-dim": "#ffb4aa", "surface": "#121317", "primary-fixed": "#ffdad5", "secondary": "#ffb95f", "error": "#ffb4ab", "tertiary-fixed": "#d5e3ff", "secondary-container": "#ee9800", "tertiary-container": "#0072d7", "on-tertiary-container": "#f8f9ff", "surface-bright": "#38393e", "secondary-fixed": "#ffddb8", "surface-container-lowest": "#0d0e12", "on-secondary-fixed-variant": "#653e00", "background": "#121317", "tertiary": "#a7c8ff", "primary": "#ffb4aa", "on-error-container": "#ffdad6", "surface-container": "#1f1f24", "inverse-primary": "#c0000c", "surface-dim": "#121317", "surface-variant": "#343439", "on-surface-variant": "#e9bcb6", "on-tertiary-fixed": "#001b3c", "on-secondary": "#472a00", "on-primary-container": "#fff7f6", "on-tertiary-fixed-variant": "#004689", "on-background": "#e3e2e8", "surface-container-high": "#292a2e", "inverse-surface": "#e3e2e8", "on-primary-fixed-variant": "#930007", "on-surface": "#e3e2e8", "primary-container": "#e50914", "outline-variant": "#5e3f3b", "on-error": "#690005", "on-primary": "#690003", "on-tertiary": "#003061", "secondary-fixed-dim": "#ffb95f", "on-primary-fixed": "#410001", "on-secondary-fixed": "#2a1700", "error-container": "#93000a", "surface-container-highest": "#343439" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "margin": "2.5rem", "space-xl": "2.5rem", "margin-mobile": "1rem", "gutter": "1rem", "space-md": "1rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem" }, "fontFamily": { "headline-md": ["Manrope"], "headline-xl-mobile": ["Bebas Neue"], "label-dj": ["Space Grotesk"], "body-lg": ["Manrope"], "display-hero-mobile": ["Bebas Neue"], "headline-xl": ["Bebas Neue"], "body-md": ["Manrope"], "label-price": ["Space Grotesk"], "display-hero": ["Bebas Neue"], "body-sm": ["Manrope"], "label-badge": ["Space Grotesk"], "headline-lg": ["Bebas Neue"] }, "fontSize": { "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "700" }], "headline-xl-mobile": ["26px", { "lineHeight": "30px", "fontWeight": "400" }], "label-dj": ["11px", { "lineHeight": "14px", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "500" }], "display-hero-mobile": ["38px", { "lineHeight": "40px", "fontWeight": "400" }], "headline-xl": ["36px", { "lineHeight": "38px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "label-price": ["13px", { "lineHeight": "16px", "fontWeight": "700" }], "display-hero": ["56px", { "lineHeight": "56px", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "label-badge": ["10px", { "lineHeight": "12px", "fontWeight": "600" }], "headline-lg": ["24px", { "lineHeight": "28px", "fontWeight": "400" }] } } } }</script></head><body class="bg-surface-container-lowest text-on-surface font-body-md text-body-md antialiased min-h-screen relative flex flex-col selection:bg-primary-container selection:text-on-primary-container"><header class="fixed top-0 inset-x-0 z-50 bg-gradient-to-b from-surface-container-lowest/95 via-surface-container-lowest/60 to-transparent pt-safe"><div class="h-16 px-gutter-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0 flex-1"><button aria-label="Rudi nyuma" class="w-11 h-11 -ml-1 flex items-center justify-center text-on-surface hover:text-primary transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><div class="flex items-center gap-space-xs min-w-0"><span class="font-headline-md text-headline-md text-on-surface truncate leading-tight">Video Player</span><span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface-container-lowest border border-secondary text-secondary font-label-dj text-label-dj uppercase shrink-0"><span class="material-symbols-outlined text-[13px]">mic</span>DJ Afro</span></div></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Swahili / English Audio Switcher" class="h-9 px-2.5 rounded-full bg-surface-container-high/80 border border-outline-variant/60 flex items-center gap-1.5 text-secondary hover:text-secondary-fixed transition-colors" type="button"><span class="material-symbols-outlined text-[18px]">volume_up</span><span class="font-label-badge text-label-badge font-bold tracking-wider">SWAHILI</span></button><button aria-label="Video Settings" class="w-11 h-11 flex items-center justify-center text-on-surface hover:text-primary transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">settings</span></button></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface-container-lowest"><div class="flex flex-col w-full text-on-surface">
+<!-- Interactive Cinematic Stage -->
+<section class="relative w-full aspect-video sm:aspect-[21/9] bg-surface-container-lowest overflow-hidden select-none group" id="player-viewport">
+<!-- Action Still Background with Multi-tier Gradient Vignette -->
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out scale-100" data-alt="Cinematic high adrenaline action movie still of a rugged mercenary tactical operative running through rain-drenched neon streets of Dar es Salaam at night, atmospheric volumetric orange and teal streetlights, muzzle flashes, ultra realistic 4k movie frame, sharp details with film grain" id="video-frame" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBWMNoADH8OfHvRRT217WTHn2ClcISb1F1WoqoNQsgL6rREHZoiBEbl8heJrvYgjy7SjeMLIjDqY1OsFH8_M0_krlKbF0-EDmvOGpxkaDsW7tF3jqWgs1jcWhhLOTFs57I4lydRNOicnzakR2wmhcgBpV9NaOHuYFNq5LvsZAj68174jKyFsackgH5IT3-5c-x_nhmOP65JjoLDosRsBixNWuuWs24918wo9ew4xLcT_hPw3jTyKigy')">
+</div>
+<!-- Gradient Darkness Scrims for Controls Readability -->
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-surface-container-lowest/80 pointer-events-none"></div>
+<div class="absolute inset-0 bg-surface-container-lowest/20 pointer-events-none"></div>
+<!-- Live Translator Pulse Watermark (Top Left in player) -->
+<div class="absolute top-3 left-3 flex items-center gap-space-xs z-20 pointer-events-none">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-md">
+<span class="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
+<span class="font-label-dj text-label-dj text-secondary uppercase tracking-wider">LIVE DJ VJ TRACK</span>
+</span>
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container-high/90 text-on-surface font-label-badge text-label-badge">
+        1080p FHD
+      </span>
+</div>
+<!-- Top Floating Actions Inside Player (Quick Ambient HUD) -->
+<div class="absolute top-3 right-3 flex items-center gap-space-xs z-20">
+<button aria-label="Kufunga Kioo" class="w-9 h-9 rounded-full bg-surface-container-high/70 backdrop-blur-md flex items-center justify-center text-on-surface active:scale-95 transition-transform" id="btn-lock-toggle" type="button">
+<span class="material-symbols-outlined text-[18px]" id="lock-icon">lock_open</span>
+</button>
+<button aria-label="Sauti na Lugha" class="h-9 px-2.5 rounded-full bg-surface-container-high/80 backdrop-blur-md flex items-center gap-1.5 text-secondary active:scale-95 transition-transform" onclick="document.getElementById('dj-selector-section').scrollIntoView({behavior:'smooth'})" type="button">
+<span class="material-symbols-outlined text-[18px]">graphic_eq</span>
+<span class="font-label-badge text-label-badge">DJ AFRO</span>
+</button>
+</div>
+<!-- Central Hero Controls Overlay -->
+<div class="absolute inset-0 flex items-center justify-center gap-6 sm:gap-12 z-20 pointer-events-auto" id="player-middle-controls">
+<!-- Skip -10s -->
+<button aria-label="Rudi nyuma sekunde 10" class="w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-surface-container-lowest/60 backdrop-blur-md text-on-surface flex flex-col items-center justify-center active:scale-90 transition-transform hover:text-primary" id="btn-rewind" type="button">
+<span class="material-symbols-outlined text-[24px]">replay_10</span>
+<span class="font-label-badge text-label-badge -mt-1 opacity-80">-10s</span>
+</button>
+<!-- Big Neon Play/Pause Pulsar -->
+<button aria-label="Cheza au Sitisha Filamu" class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary-container text-on-primary-container shadow-xl flex items-center justify-center active:scale-95 transition-all" id="btn-main-play" type="button">
+<span class="absolute inset-0 rounded-full bg-primary-container opacity-40 animate-ping pointer-events-none"></span>
+<span class="material-symbols-outlined text-[36px] sm:text-[44px] ml-0.5" id="main-play-icon" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+<!-- Skip +10s -->
+<button aria-label="Songa mbele sekunde 10" class="w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-surface-container-lowest/60 backdrop-blur-md text-on-surface flex flex-col items-center justify-center active:scale-90 transition-transform hover:text-primary" id="btn-forward" type="button">
+<span class="material-symbols-outlined text-[24px]">forward_10</span>
+<span class="font-label-badge text-label-badge -mt-1 opacity-80">+10s</span>
+</button>
+</div>
+<!-- Bottom Scrubber & Time Controls -->
+<div class="absolute inset-x-0 bottom-0 px-3 py-2.5 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/90 to-transparent">
+<!-- Interactive Glowing Progress Seeker -->
+<div class="relative w-full h-4 flex items-center cursor-pointer group/seeker" id="progress-bar-container">
+<!-- Buffer line -->
+<div class="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden relative">
+<div class="h-full bg-outline-variant/60 w-[58%] rounded-full"></div>
+<div class="absolute inset-y-0 left-0 bg-primary-container rounded-full w-[36%]" id="seeker-progress-fill"></div>
+</div>
+<!-- Glowing Thumb Pin -->
+<div class="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-on-primary-container shadow-md left-[36%] -ml-1.5 transition-transform group-hover/seeker:scale-125" id="seeker-thumb">
+<div class="w-full h-full rounded-full bg-primary-container animate-pulse opacity-60"></div>
+</div>
+</div>
+<!-- Controls Row: Time + Speed + Mini Fullscreen -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-price text-label-price text-on-surface tracking-wide" id="time-display">
+            42:15 <span class="text-on-surface-variant font-normal">/ 1:58:30</span>
+</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-badge text-label-badge uppercase">
+            Surround 5.1
+          </span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button aria-label="Dirisha Dogo (PiP)" class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:text-primary" id="pip-button" type="button">
+<span class="material-symbols-outlined text-[20px]">picture_in_picture_alt</span>
+</button>
+<button aria-label="Kioo Kizima (Fullscreen)" class="w-8 h-8 rounded flex items-center justify-center text-on-surface hover:text-secondary" id="fs-button" type="button">
+<span class="material-symbols-outlined text-[22px]">fullscreen</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Player Meta & Title Bar -->
+<section class="px-margin-mobile py-space-sm flex flex-col gap-space-xs bg-surface-container-low shadow-sm">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center gap-space-xs flex-wrap mb-1">
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-dj text-label-dj uppercase tracking-wider">
+            Burudani Kali
+          </span>
+<span class="font-label-badge text-label-badge text-secondary">
+            ★ 9.8 / 10 • Milipuko &amp; Mapambano
+          </span>
+</div>
+<h1 class="font-headline-xl-mobile text-headline-xl-mobile text-on-surface tracking-wide truncate">
+          EXTRACTOR 2: DAR HUNT
+        </h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1">
+          Sehemu ya 1: Kamanda Tyler anapovamia bandari ya usiku kutegua mtego wa majasusi.
+        </p>
+</div>
+<!-- Quick Action Pill Group -->
+<div class="flex items-center gap-space-xs shrink-0">
+<button class="flex flex-col items-center justify-center w-10 h-10 rounded-xl bg-surface-container active:scale-95 transition-all text-on-surface" id="btn-like" type="button">
+<span class="material-symbols-outlined text-[20px]" id="like-icon">favorite_border</span>
+</button>
+<button class="flex flex-col items-center justify-center w-10 h-10 rounded-xl bg-surface-container active:scale-95 transition-all text-on-surface" id="btn-share" type="button">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+</section>
+<!-- DJ Live Commentary Translation Drawer -->
+<section class="px-margin-mobile py-space-md flex flex-col gap-space-sm" id="dj-selector-section">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[22px]">record_voice_over</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">
+          Chagua Sauti ya DJ (VJ Translators)
+        </h2>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-badge text-label-badge">
+        4 Sauti Zinapatikana
+      </span>
+</div>
+<!-- Commentary Options Rail / List -->
+<div class="flex flex-col gap-space-xs" id="dj-options-container">
+<!-- Option 1: DJ Afro (Active Verified) -->
+<div class="dj-option-card relative p-3 rounded-xl bg-surface-container-high cursor-pointer flex items-center justify-between shadow-md transition-all" data-dj="afro" role="button" tabindex="0">
+<div class="flex items-center gap-3 min-w-0">
+<!-- Stylized Avatar / DJ Badge -->
+<div class="w-11 h-11 rounded-full bg-surface-container-lowest flex items-center justify-center relative shrink-0">
+<span class="font-label-dj text-label-dj text-secondary">AFRO</span>
+<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-secondary-container"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-md text-headline-md text-on-surface truncate">DJ Afro Amigo</span>
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span class="px-1.5 py-0.2 rounded bg-secondary-container text-on-secondary-container font-label-badge text-label-badge uppercase">BORA</span>
+</div>
+<span class="font-body-sm text-body-sm text-secondary truncate">
+              Kalamu ya Chuma • Ucheshi &amp; Chombezo Kamili
+            </span>
+</div>
+</div>
+<!-- Equalizer Animation & Radio Check -->
+<div class="flex items-center gap-space-sm shrink-0">
+<div class="flex items-end gap-0.5 h-4 w-5 justify-center" id="eq-waves">
+<span class="w-1 bg-secondary rounded-full h-3 animate-pulse"></span>
+<span class="w-1 bg-secondary rounded-full h-4 animate-bounce"></span>
+<span class="w-1 bg-secondary rounded-full h-2 animate-pulse"></span>
+</div>
+<div class="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+</div>
+</div>
+<!-- Option 2: DJ Murphy -->
+<div class="dj-option-card relative p-3 rounded-xl bg-surface-container cursor-pointer flex items-center justify-between hover:bg-surface-container-high transition-all" data-dj="murphy" role="button" tabindex="0">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-11 h-11 rounded-full bg-surface-container-lowest flex items-center justify-center shrink-0">
+<span class="font-label-dj text-label-dj text-on-surface-variant">MURP</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-md text-headline-md text-on-surface truncate">DJ Murphy</span>
+<span class="material-symbols-outlined text-outline text-[16px]">verified</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">
+              Kasi &amp; Mkwaju • Sauti Nzito za Bunduki &amp; Mapigo
+            </span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-transparent">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+</div>
+<!-- Option 3: DJ Smith -->
+<div class="dj-option-card relative p-3 rounded-xl bg-surface-container cursor-pointer flex items-center justify-between hover:bg-surface-container-high transition-all" data-dj="smith" role="button" tabindex="0">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-11 h-11 rounded-full bg-surface-container-lowest flex items-center justify-center shrink-0">
+<span class="font-label-dj text-label-dj text-on-surface-variant">SMTH</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-md text-headline-md text-on-surface truncate">DJ Smith</span>
+<span class="material-symbols-outlined text-outline text-[16px]">verified</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">
+              Ufafanuzi Makini • Military Lore &amp; Mikakati
+            </span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-transparent">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+</div>
+<!-- Option 4: English Original Audio -->
+<div class="dj-option-card relative p-3 rounded-xl bg-surface-container cursor-pointer flex items-center justify-between hover:bg-surface-container-high transition-all" data-dj="original" role="button" tabindex="0">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-11 h-11 rounded-full bg-surface-container-lowest flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">translate</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-md text-headline-md text-on-surface truncate">Sauti Asilia (English Audio)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">
+              Original Cinema Mix • Hakuna DJ Mfasiri
+            </span>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-transparent">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+</div>
+</div>
+<!-- Pro Audio Mixer Slider: DJ Voice vs Movie Sound FX -->
+<div class="mt-space-xs p-3.5 rounded-xl bg-surface-container-high flex flex-col gap-space-xs">
+<div class="flex items-center justify-between font-label-price text-label-price">
+<span class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-secondary">tune</span>
+          Mlinganyo wa Sauti ya DJ (Voice Mix)
+        </span>
+<span class="text-secondary" id="dj-mix-val">85%</span>
+</div>
+<input class="w-full accent-secondary bg-surface-container-lowest h-1.5 rounded-lg appearance-none cursor-pointer" id="dj-mix-slider" max="100" min="0" type="range" value="85"/>
+<div class="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
+<span>Sauti ya Filamu Zaidi</span>
+<span>DJ Juu Zaidi</span>
+</div>
+</div>
+</section>
+<!-- Player Settings Drawer: Speed, Quality & Sleep Timer -->
+<section class="px-margin-mobile py-space-sm flex flex-col gap-space-md">
+<!-- Stream Speed Selector -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-body-lg text-body-lg text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-primary">speed</span>
+        Kasi ya Kucheza (Speed)
+      </span>
+<div class="grid grid-cols-4 gap-space-xs">
+<button class="speed-btn py-2 rounded-lg bg-surface-container text-on-surface font-label-price text-label-price text-center active:scale-95 transition-all hover:bg-surface-container-high" type="button">0.75x</button>
+<button class="speed-btn py-2 rounded-lg bg-primary-container text-on-primary-container font-label-price text-label-price text-center shadow-md active:scale-95 transition-all" type="button">1.0x</button>
+<button class="speed-btn py-2 rounded-lg bg-surface-container text-on-surface font-label-price text-label-price text-center active:scale-95 transition-all hover:bg-surface-container-high" type="button">1.25x</button>
+<button class="speed-btn py-2 rounded-lg bg-surface-container text-on-surface font-label-price text-label-price text-center active:scale-95 transition-all hover:bg-surface-container-high" type="button">1.5x</button>
+</div>
+</div>
+<!-- Video Quality (Data Friendly for East Africa Mobile Bundles) -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-body-lg text-body-lg text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px] text-secondary">wifi_tethering</span>
+          Ubora wa Video (Data Bundles Saver)
+        </span>
+<span class="font-label-badge text-label-badge text-secondary">M-Pesa / Tigo Bando OK</span>
+</div>
+<div class="grid grid-cols-3 gap-space-xs">
+<button class="quality-btn p-2.5 rounded-xl bg-surface-container-high flex flex-col items-center gap-0.5 active:scale-95 transition-all text-on-surface" type="button">
+<span class="font-label-price text-label-price text-secondary">Auto (1080p)</span>
+<span class="font-label-badge text-label-badge text-on-surface-variant">Bora Zaidi</span>
+</button>
+<button class="quality-btn p-2.5 rounded-xl bg-surface-container flex flex-col items-center gap-0.5 active:scale-95 transition-all text-on-surface hover:bg-surface-container-high" type="button">
+<span class="font-label-price text-label-price">720p HD</span>
+<span class="font-label-badge text-label-badge text-on-surface-variant">~450 MB / saa</span>
+</button>
+<button class="quality-btn p-2.5 rounded-xl bg-surface-container flex flex-col items-center gap-0.5 active:scale-95 transition-all text-on-surface hover:bg-surface-container-high" type="button">
+<span class="font-label-price text-label-price">480p SD</span>
+<span class="font-label-badge text-label-badge text-on-surface-variant">~200 MB / saa</span>
+</button>
+</div>
+</div>
+<!-- Sleep Timer Toggle Pills -->
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-low">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px] text-primary">bedtime</span>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md text-on-surface">Kipima Usingizi (Sleep Timer)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Zima filamu ukilala</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="px-2 py-1 rounded bg-primary-container text-on-primary-container font-label-badge text-label-badge" type="button">ZIMA</button>
+<button class="px-2 py-1 rounded bg-surface-container text-on-surface-variant font-label-badge text-label-badge" type="button">15 DK</button>
+<button class="px-2 py-1 rounded bg-surface-container text-on-surface-variant font-label-badge text-label-badge" type="button">30 DK</button>
+</div>
+</div>
+</section>
+<!-- Next Up / Inayofuata (Autoplay Carousel Card) -->
+<section class="px-margin-mobile py-space-md flex flex-col gap-space-sm mb-6">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary-container text-[22px]">play_circle</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">
+          Inayofuata (Next In Queue)
+        </h2>
+</div>
+<!-- Autoplay Toggle Switch -->
+<label class="flex items-center gap-2 cursor-pointer">
+<span class="font-label-badge text-label-badge text-on-surface-variant">Kiotomatiki</span>
+<div class="relative w-9 h-5 bg-primary-container rounded-full p-0.5 transition-colors">
+<div class="w-4 h-4 rounded-full bg-on-primary-container translate-x-4 shadow-sm transition-transform"></div>
+</div>
+</label>
+</div>
+<!-- Next Item Card (Sehemu ya 2) -->
+<div class="relative rounded-2xl overflow-hidden bg-surface-container flex flex-row items-stretch p-2.5 gap-3 shadow-md active:scale-[0.99] transition-transform cursor-pointer">
+<!-- Thumbnail with Overlay Badge -->
+<div class="relative w-28 sm:w-36 aspect-video rounded-xl overflow-hidden shrink-0 bg-surface-container-high">
+<div class="w-full h-full bg-cover bg-center" data-alt="Intense high adrenaline action movie poster banner showing armored convoy escort explosion with fiery orange sparks against Dar city skyline at dusk, cinematic movie photography" id="next-thumb" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBP-v0pYHOlJqec82WE6_c8ZvJSJjKy_coGAzvH2jKh_CU4qT0cdy_qFhYq8z78AQML3WnM8jcRX6DKF32AIveBZtg96fC4z4GMTLXwXsDlKjUM2C7DztHdM5tIRgwrodxg_UiAnEcRgP_irCJqSAwJHGqtiDlw94QUebE7WIg59nLz-iZNaPFnu6VKB1gRaK7GsmoDt9DX5pUtEEEZwFeVfvc0yPzdcc9O4DAjFntRqZTRW_HhJObY')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/80 via-transparent to-transparent"></div>
+<span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-surface-container-lowest/90 text-on-surface font-label-price text-label-price">
+          1:45:10
+        </span>
+</div>
+<!-- Info Meta -->
+<div class="flex flex-col justify-center min-w-0 flex-1">
+<span class="font-label-badge text-label-badge text-secondary uppercase tracking-wider">
+          SEHEMU YA 2 YA 2 (FINALE)
+        </span>
+<h3 class="font-headline-md text-headline-md text-on-surface truncate">
+          Extractor 2: Dar Hunt (Mwisho)
+        </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">
+          DJ Afro • Vita Vya Bandarini &amp; Msaliti Afichuka
+        </p>
+<div class="mt-2 flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-price text-label-price">
+            TSh 500
+          </span>
+<span class="font-body-sm text-body-sm text-secondary flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[14px]">bolt</span> Imejumuishwa na VIP
+          </span>
+</div>
+</div>
+<div class="flex items-center pr-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</div>
+<!-- Suggested Alternative -->
+<div class="relative rounded-2xl overflow-hidden bg-surface-container flex flex-row items-stretch p-2.5 gap-3 shadow-md active:scale-[0.99] transition-transform cursor-pointer opacity-90">
+<div class="relative w-28 sm:w-36 aspect-video rounded-xl overflow-hidden shrink-0 bg-surface-container-high">
+<div class="w-full h-full bg-cover bg-center" data-alt="Martial arts close quarters combat action film poster, rain slicked hallway with neon red ambient lighting, dynamic punch impact, ultra intense cinematic tone" id="rec-thumb" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDKWAEQIqY0f4AU_jQaVf62_iqNV-2B9Yosd6Evt86UB5ixIWjsNhXIs1UZsR6xN3Ul4Rz_tPTZQbneDGtacEL0JSDWiS1blUC95OohJe9B7ovZHahW5Cz8cf-t9cpyKEYGW-fSYpGWKY3I7bj8KBINiVX07ZDgcWw5AynFr_f-7TZRsCttIeWNxabc4QA_TRx2b-ukn66OdYKUJbcuI3w4R2Xi1bDOTSijdH43FefNQEC-LNu-HN4k')">
+</div>
+<span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-surface-container-lowest/90 text-on-surface font-label-price text-label-price">
+          2:02:18
+        </span>
+</div>
+<div class="flex flex-col justify-center min-w-0 flex-1">
+<span class="font-label-badge text-label-badge text-primary uppercase tracking-wider">
+          MAPENDEKEZO YA DJ
+        </span>
+<h3 class="font-headline-md text-headline-md text-on-surface truncate">
+          The Raid 2: Berandal
+        </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">
+          Tafsiri ya DJ Afro • Ngumi Jiwe &amp; Mapambano
+        </p>
+<div class="mt-2 flex items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-label-price text-label-price">
+            Bure (Free VIP)
+          </span>
+</div>
+</div>
+<div class="flex items-center pr-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[24px]">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- Client-side Interactive Behaviors -->
+<script>
+    (() => {
+      // 1. Play / Pause Toggle Interaction
+      const playBtn = document.getElementById('btn-main-play');
+      const playIcon = document.getElementById('main-play-icon');
+      let isPlaying = true;
+
+      if (playBtn && playIcon) {
+        playBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          isPlaying = !isPlaying;
+          playIcon.innerText = isPlaying ? 'pause' : 'play_arrow';
+        });
+      }
+
+      // 2. DJ Selector Logic
+      const djCards = document.querySelectorAll('.dj-option-card');
+      const djMixVal = document.getElementById('dj-mix-val');
+      const djMixSlider = document.getElementById('dj-mix-slider');
+
+      djCards.forEach(card => {
+        card.addEventListener('click', () => {
+          djCards.forEach(c => {
+            c.classList.remove('bg-surface-container-high');
+            c.classList.add('bg-surface-container');
+            const check = c.querySelector('.material-symbols-outlined:last-child');
+            if (check && check.parentElement) {
+              check.parentElement.className = 'w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-transparent';
+            }
+          });
+          card.classList.remove('bg-surface-container');
+          card.classList.add('bg-surface-container-high');
+          const checkIcon = card.querySelector('.material-symbols-outlined:last-child');
+          if (checkIcon && checkIcon.parentElement) {
+            checkIcon.parentElement.className = 'w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-on-secondary';
+          }
+        });
+      });
+
+      if (djMixSlider && djMixVal) {
+        djMixSlider.addEventListener('input', (e) => {
+          djMixVal.innerText = `${e.target.value}%`;
+        });
+      }
+
+      // 3. Playback Speed Selector
+      const speedBtns = document.querySelectorAll('.speed-btn');
+      speedBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          speedBtns.forEach(b => {
+            b.className = 'speed-btn py-2 rounded-lg bg-surface-container text-on-surface font-label-price text-label-price text-center active:scale-95 transition-all hover:bg-surface-container-high';
+          });
+          btn.className = 'speed-btn py-2 rounded-lg bg-primary-container text-on-primary-container font-label-price text-label-price text-center shadow-md active:scale-95 transition-all';
+        });
+      });
+
+      // 4. Quality Selector
+      const qualityBtns = document.querySelectorAll('.quality-btn');
+      qualityBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          qualityBtns.forEach(q => {
+            q.classList.remove('bg-surface-container-high');
+            q.classList.add('bg-surface-container');
+          });
+          btn.classList.add('bg-surface-container-high');
+          btn.classList.remove('bg-surface-container');
+        });
+      });
+
+      // 5. Screen Lock Interaction
+      const lockBtn = document.getElementById('btn-lock-toggle');
+      const lockIcon = document.getElementById('lock-icon');
+      const midControls = document.getElementById('player-middle-controls');
+      let isLocked = false;
+
+      if (lockBtn && lockIcon && midControls) {
+        lockBtn.addEventListener('click', () => {
+          isLocked = !isLocked;
+          lockIcon.innerText = isLocked ? 'lock' : 'lock_open';
+          midControls.style.opacity = isLocked ? '0' : '1';
+          midControls.style.pointerEvents = isLocked ? 'none' : 'auto';
+        });
+      }
+
+      // 6. Like Button Toggle
+      const likeBtn = document.getElementById('btn-like');
+      const likeIcon = document.getElementById('like-icon');
+      let isLiked = false;
+      if (likeBtn && likeIcon) {
+        likeBtn.addEventListener('click', () => {
+          isLiked = !isLiked;
+          likeIcon.innerText = isLiked ? 'favorite' : 'favorite_border';
+          likeIcon.style.color = isLiked ? '#e50914' : 'inherit';
+        });
+      }
+    })();
+  </script>
+</div></main></body></html>

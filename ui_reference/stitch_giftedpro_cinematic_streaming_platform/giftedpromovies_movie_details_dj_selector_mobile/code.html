@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="sw"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>GIFTEDproMovies</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=Manrope:wght@400;500;600;700&amp;family=Space+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#121317;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-secondary-container": "#5b3800", "surface-tint": "#ffb4aa", "outline": "#af8782", "inverse-on-surface": "#2f3035", "surface-container-low": "#1a1b20", "tertiary-fixed-dim": "#a7c8ff", "primary-fixed-dim": "#ffb4aa", "surface": "#121317", "primary-fixed": "#ffdad5", "secondary": "#ffb95f", "error": "#ffb4ab", "tertiary-fixed": "#d5e3ff", "secondary-container": "#ee9800", "tertiary-container": "#0072d7", "on-tertiary-container": "#f8f9ff", "surface-bright": "#38393e", "secondary-fixed": "#ffddb8", "surface-container-lowest": "#0d0e12", "on-secondary-fixed-variant": "#653e00", "background": "#121317", "tertiary": "#a7c8ff", "primary": "#ffb4aa", "on-error-container": "#ffdad6", "surface-container": "#1f1f24", "inverse-primary": "#c0000c", "surface-dim": "#121317", "surface-variant": "#343439", "on-surface-variant": "#e9bcb6", "on-tertiary-fixed": "#001b3c", "on-secondary": "#472a00", "on-primary-container": "#fff7f6", "on-tertiary-fixed-variant": "#004689", "on-background": "#e3e2e8", "surface-container-high": "#292a2e", "inverse-surface": "#e3e2e8", "on-primary-fixed-variant": "#930007", "on-surface": "#e3e2e8", "primary-container": "#e50914", "outline-variant": "#5e3f3b", "on-error": "#690005", "on-primary": "#690003", "on-tertiary": "#003061", "secondary-fixed-dim": "#ffb95f", "on-primary-fixed": "#410001", "on-secondary-fixed": "#2a1700", "error-container": "#93000a", "surface-container-highest": "#343439" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "margin": "2.5rem", "space-xl": "2.5rem", "margin-mobile": "1rem", "gutter": "1rem", "space-md": "1rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem" }, "fontFamily": { "headline-md": ["Manrope"], "headline-xl-mobile": ["Bebas Neue"], "label-dj": ["Space Grotesk"], "body-lg": ["Manrope"], "display-hero-mobile": ["Bebas Neue"], "headline-xl": ["Bebas Neue"], "body-md": ["Manrope"], "label-price": ["Space Grotesk"], "display-hero": ["Bebas Neue"], "body-sm": ["Manrope"], "label-badge": ["Space Grotesk"], "headline-lg": ["Bebas Neue"] }, "fontSize": { "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "700" }], "headline-xl-mobile": ["26px", { "lineHeight": "30px", "fontWeight": "400" }], "label-dj": ["11px", { "lineHeight": "14px", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "500" }], "display-hero-mobile": ["38px", { "lineHeight": "40px", "fontWeight": "400" }], "headline-xl": ["36px", { "lineHeight": "38px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "label-price": ["13px", { "lineHeight": "16px", "fontWeight": "700" }], "display-hero": ["56px", { "lineHeight": "56px", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "label-badge": ["10px", { "lineHeight": "12px", "fontWeight": "600" }], "headline-lg": ["24px", { "lineHeight": "28px", "fontWeight": "400" }] } } } }</script></head><body class="bg-surface text-on-surface font-body-md text-body-md antialiased min-h-screen relative flex flex-col selection:bg-primary-container selection:text-on-primary-container"><header class="fixed top-0 inset-x-0 z-50 bg-surface-container-lowest/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.5)]"><div class="h-16 px-gutter-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0 flex-1"><button aria-label="Rudi nyuma" class="w-11 h-11 -ml-1 flex items-center justify-center text-on-surface hover:text-primary transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><div class="flex flex-col min-w-0"><span class="font-headline-md text-headline-md text-on-surface truncate leading-tight">Movie Details</span><span class="font-label-badge text-label-badge text-outline tracking-widest uppercase truncate">GIFTEDpro Cinematic</span></div></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Share" class="w-11 h-11 flex items-center justify-center text-on-surface hover:text-primary transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">share</span></button><a aria-label="Nyumbani" class="w-11 h-11 flex items-center justify-center text-on-surface hover:text-primary transition-colors" data-path="nyumbani" href="#"><span class="material-symbols-outlined text-[22px]">home</span></a></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full text-on-surface">
+<!-- 1. Hero Visual Canvas & Media Metadata -->
+<div class="relative w-full">
+<!-- Backdrop Media Frame -->
+<div class="relative w-full h-[280px] overflow-hidden bg-surface-container-lowest">
+<img class="w-full h-full object-cover object-center scale-105 transform" data-alt="High stakes tactical cinematic explosion scene set in urban Dar es Salaam night port, fiery crimson and amber light reflections on wet asphalt, special forces operative moving strategically, cinematic 4k movie still with intense atmospheric haze and high contrast shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOa0uHefPPPNrNYCadYqFgl8bO7RSbfwpRMkesBN0HLTpQJjWny-DNnLHLH4rtMh8gTvYs3B7ozI8Lo7FeURMLOGoJ2CkqGohaP-g8Lao1XgH_n6pAMt3Lo7eUelzbeADzOJbbW5v-iiuRIozMQQQaXYCGJei-ZzCFUf0B05DdfJkH71BEyI2YvnHwMntqEBfC4SiFrrDysOufUEjt3g9-FgqlVA_MUVQ_Yk7hCCu327GitqzJGemn"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent"></div>
+<div class="absolute inset-0 bg-gradient-to-r from-surface/80 via-transparent to-surface/20"></div>
+<!-- Video Badge / Tech Stack -->
+<div class="absolute top-space-sm left-space-md flex items-center gap-space-xs">
+<span class="bg-surface-container-lowest/80 backdrop-blur-md text-on-surface font-label-badge text-label-badge px-2 py-0.5 rounded-sm tracking-wider uppercase">4K ULTRA HD</span>
+<span class="bg-surface-container-lowest/80 backdrop-blur-md text-secondary font-label-badge text-label-badge px-2 py-0.5 rounded-sm tracking-wider">DOLBY 5.1</span>
+</div>
+<!-- Play Trailer Trigger Floating Badge -->
+<button class="absolute inset-0 m-auto w-14 h-14 rounded-full bg-primary-container/90 text-on-primary-container flex items-center justify-center shadow-xl transform active:scale-90 transition-transform" id="playTrailerBtn" type="button">
+<span class="material-symbols-outlined text-[32px] translate-x-0.5" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<!-- Bottom Overlay Pills -->
+<div class="absolute bottom-3 left-space-md right-space-md flex items-center justify-between text-on-surface">
+<div class="flex items-center gap-2">
+<span class="bg-surface-container-highest/90 text-on-surface-variant font-label-badge text-label-badge px-1.5 py-0.5 rounded">16+</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant font-medium">1h 58m</span>
+<span class="text-body-sm font-body-sm text-outline">•</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant">2024</span>
+</div>
+<div class="flex items-center gap-1.5 bg-surface-container-lowest/90 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-secondary text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-dj text-label-dj text-secondary">4.9 / 5.0</span>
+</div>
+</div>
+</div>
+<!-- Title & Primary Attributes Header -->
+<div class="px-space-md pt-space-sm flex flex-col gap-1">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="bg-primary-container text-on-primary-container font-label-badge text-label-badge px-2 py-0.5 rounded uppercase font-bold tracking-widest">Vitendo / Action</span>
+<span class="bg-surface-container-high text-on-surface-variant font-label-badge text-label-badge px-2 py-0.5 rounded uppercase tracking-wider">Kusisimua / Thriller</span>
+<span class="bg-secondary-container text-on-secondary-container font-label-badge text-label-badge px-2 py-0.5 rounded font-bold uppercase tracking-wider">Tafsiri ya Kiswahili</span>
+</div>
+<h1 class="font-headline-xl-mobile text-headline-xl-mobile text-on-surface tracking-wide mt-1 uppercase">
+        Extractor 2: Dar Hunt
+      </h1>
+<p class="font-body-sm text-body-sm text-outline">Operesheni ya Kusaka Mateka Jijini Dar es Salaam</p>
+<!-- Quick Action Icon Toolbar -->
+<div class="flex items-center gap-space-sm pt-space-xs mt-1">
+<button class="flex-1 h-10 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface flex items-center justify-center gap-2 transition-colors active:scale-98" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">smart_display</span>
+<span class="font-body-md text-body-md font-semibold">Tazama Trela</span>
+</button>
+<button aria-label="Hifadhi kwenye Orodha" class="w-10 h-10 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface flex items-center justify-center transition-colors" id="saveListBtn" type="button">
+<span class="material-symbols-outlined text-[22px]" id="saveListIcon">bookmark_add</span>
+</button>
+<button aria-label="Shiriki na Marafiki" class="w-10 h-10 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface flex items-center justify-center transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">share</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 2. DJ / Translator Version Selector Section (Core USP) -->
+<div class="px-space-md pt-space-lg flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[20px]">record_voice_over</span>
+          Chagua Toleo la DJ
+        </span>
+<span class="font-body-sm text-body-sm text-outline">Translator Audio Version</span>
+</div>
+<span class="font-label-badge text-label-badge bg-surface-container-highest text-on-surface-variant px-2 py-1 rounded">3 MA-DJ WAPO</span>
+</div>
+<!-- DJ Version Cards Container -->
+<div class="flex flex-col gap-2.5" id="djGroupSelector">
+<!-- DJ Card 1 (Active by default) -->
+<div class="dj-card relative p-3 rounded-xl bg-surface-container-high shadow-lg cursor-pointer transition-all" data-dj="afro">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-3">
+<div class="relative w-12 h-12 rounded-full overflow-hidden bg-surface-container-lowest shrink-0">
+<img class="w-full h-full object-cover" data-alt="Portrait of legendary African movie voice translator DJ Afro smiling energetically wearing studio headphones and dynamic golden lighting in a sound recording studio" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6CV7BIloIHr7WMoH5gkFpDkRCXj-_AbQtCe9pOr8AKecf0oMPp_a-s6wTqQvd5eDzcSKRTjuxn8IZao4UtO6GMKHOkaR2AjLjjx3YbtCvpIeLc5Xnfc7vOZ0Wy53RdGg7xwtKeAjyFelhcLpbuJYvCyecETO5xOlc54ZUcJRPgHyPmIFtP9fkt83qVVoEPOquQ7KC6HmevnKXX311If9vtog4Oe7qEwUSTSpdLA8kR5OE1JmEuCS4"/>
+<div class="absolute inset-0 bg-secondary/10"></div>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="font-label-dj text-label-dj text-secondary uppercase tracking-wider">DJ AFRO</span>
+<span class="bg-secondary-container text-on-secondary-container font-label-badge text-label-badge px-1.5 rounded uppercase font-bold">Kalamu ya Chuma</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate mt-0.5">Mtindo: Kibabe, Vichekesho &amp; Vituko vya Dar</span>
+<div class="flex items-center gap-3 text-outline mt-0.5">
+<span class="font-label-badge text-label-badge text-secondary flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.9
+                </span>
+<span class="font-label-badge text-label-badge text-outline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]">visibility</span> 14.2k
+                </span>
+<span class="font-label-badge text-label-badge text-outline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]">volume_up</span> Kiswahili + FX
+                </span>
+</div>
+</div>
+</div>
+<div class="dj-radio w-5 h-5 rounded-full bg-primary-container flex items-center justify-center shrink-0 mt-1">
+<div class="w-2 h-2 rounded-full bg-on-primary-container"></div>
+</div>
+</div>
+<!-- 15s Audio Sample Snippet Preview -->
+<div class="mt-2.5 pt-2 flex items-center justify-between bg-surface-container-lowest/80 px-3 py-1.5 rounded-lg">
+<button class="preview-audio-btn flex items-center gap-2 text-secondary hover:text-secondary-fixed transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">play_circle</span>
+<span class="font-label-dj text-label-dj tracking-wide uppercase">Sikiliza Sampuli (15s Sample)</span>
+</button>
+<div class="flex items-center gap-1">
+<span class="w-1 h-3 bg-secondary rounded-full animate-pulse"></span>
+<span class="w-1 h-4 bg-secondary rounded-full"></span>
+<span class="w-1 h-2 bg-secondary rounded-full animate-pulse"></span>
+<span class="w-1 h-5 bg-secondary rounded-full"></span>
+</div>
+</div>
+</div>
+<!-- DJ Card 2 -->
+<div class="dj-card relative p-3 rounded-xl bg-surface-container hover:bg-surface-container-high shadow-sm cursor-pointer transition-all" data-dj="murphy">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-3">
+<div class="relative w-12 h-12 rounded-full overflow-hidden bg-surface-container-lowest shrink-0">
+<img class="w-full h-full object-cover" data-alt="Portrait of Swahili movie jockey DJ Murphy with modern broadcast microphone, focused expression, sharp neon blue and crimson background studio vibe" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCuxtYURF9DXt7b6Y6n_4VRpsAEffWy7ZPEp2mcSZGQ0v-VJxpV-Gd1zDObd5sHhx39YlCNRIo5z7q58LZUVrTIHUNuBGIVdkouwSpJFBjmsx4Z3x_OHHtmLMw2hYiamTaAVd7sJdOhylpwVJeNow-u7cHvdErUmex-a23KxeeiMYGqkWcSMNpJTfLXR-t-NV3fXpsRkUkmpUAtPk-qQmPIuZyytv0ra-JbEa8HbuIDLSufwz9LcNa"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="font-label-dj text-label-dj text-on-surface uppercase tracking-wider font-bold">DJ MURPHY</span>
+<span class="bg-surface-container-highest text-on-surface-variant font-label-badge text-label-badge px-1.5 rounded uppercase">Kasi &amp; Mkwaju</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate mt-0.5">Fast-Paced Commentary &amp; Deep Lore</span>
+<div class="flex items-center gap-3 text-outline mt-0.5">
+<span class="font-label-badge text-label-badge text-secondary flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.8
+                </span>
+<span class="font-label-badge text-label-badge text-outline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]">visibility</span> 9.8k
+                </span>
+<span class="font-label-badge text-label-badge text-outline">Kariakoo Dialect</span>
+</div>
+</div>
+</div>
+<div class="dj-radio w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 mt-1">
+<div class="w-2 h-2 rounded-full bg-transparent"></div>
+</div>
+</div>
+</div>
+<!-- DJ Card 3 -->
+<div class="dj-card relative p-3 rounded-xl bg-surface-container hover:bg-surface-container-high shadow-sm cursor-pointer transition-all" data-dj="smith">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-3">
+<div class="relative w-12 h-12 rounded-full overflow-hidden bg-surface-container-lowest shrink-0">
+<img class="w-full h-full object-cover" data-alt="Portrait of Swahili action translator DJ Smith seated in audio booth wearing black cap and professional condenser mic, ambient soft red key light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhoNgyMUVJiEPTz_H7QVgRic36x5r2IYjGVttdw1mbiqvA6-LktJtDSrKtIx7zB9lkV_epas6u_WPtI9WvYHbvgwkKNofTBulJUwXNz9ltLKoChGKQnsPOu1ucaoBYtQt2nsq5pHjjgm8WvdJ9SIgWpkytW9utPU1P4R4B_QhF_aYPaLnT_EXEF-k8xnIsEcEI6Nd989LKCL7RY3nMtpdVx4rHOG-XivLlSH71Hmd-fSwJJvF59J3V"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="font-label-dj text-label-dj text-on-surface uppercase tracking-wider font-bold">DJ SMITH</span>
+<span class="bg-surface-container-highest text-on-surface-variant font-label-badge text-label-badge px-1.5 rounded uppercase">Ufafanuzi Makini</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate mt-0.5">Uchambuzi wa Mbinu za Kivita &amp; Silaha</span>
+<div class="flex items-center gap-3 text-outline mt-0.5">
+<span class="font-label-badge text-label-badge text-secondary flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.7
+                </span>
+<span class="font-label-badge text-label-badge text-outline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]">visibility</span> 8.1k
+                </span>
+<span class="font-label-badge text-label-badge text-outline">Sanifu Safi</span>
+</div>
+</div>
+</div>
+<div class="dj-radio w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 mt-1">
+<div class="w-2 h-2 rounded-full bg-transparent"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Access & Pricing Dual Model -->
+<div class="px-space-md pt-space-lg flex flex-col gap-space-sm">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Chagua Jinsi ya Kutazama</span>
+<span class="font-body-sm text-body-sm text-outline">Lipia kwa M-Pesa, Airtel Money au Tigo Pesa papo hapo</span>
+</div>
+<!-- Dual Purchase Cards -->
+<div class="grid grid-cols-1 gap-space-sm">
+<!-- Option A: Stream Now -->
+<button class="w-full text-left p-3.5 rounded-xl bg-primary-container text-on-primary-container shadow-xl flex items-center justify-between transform active:scale-[0.99] transition-transform" type="button">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-full bg-on-primary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">play_arrow</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-lg text-body-lg font-bold leading-tight">Tazama Moja kwa Moja</span>
+<span class="font-body-sm text-body-sm opacity-90">Stream Now (Masaa 48 ya Kuangalia)</span>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0">
+<span class="font-label-price text-label-price text-[16px] font-bold">TSh 1,500</span>
+<span class="font-label-badge text-label-badge uppercase opacity-80">Lipa &amp; Tazama</span>
+</div>
+</button>
+<!-- Option B: Download for Offline -->
+<button class="w-full text-left p-3.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface shadow-md flex items-center justify-between transform active:scale-[0.99] transition-transform" type="button">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-full bg-surface-container-lowest flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[22px]">download_for_offline</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-lg text-body-lg font-bold leading-tight">Pakua Utazame Offline</span>
+<span class="font-body-sm text-body-sm text-outline">Download 1080p (Siku 30 Kwenye Simu)</span>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0">
+<span class="font-label-price text-label-price text-[16px] font-bold text-secondary">TSh 2,500</span>
+<span class="font-label-badge text-label-badge text-outline uppercase">MB 840 Tu</span>
+</div>
+</button>
+</div>
+<!-- VIP Pass Banner -->
+<div class="relative overflow-hidden p-3 rounded-xl bg-surface-container-low flex items-center justify-between gap-3">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-sm shrink-0">
+<span class="material-symbols-outlined text-[18px]">workspace_premium</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-on-surface leading-tight">Una GIFTEDpro VIP Pass?</span>
+<span class="font-body-sm text-body-sm text-outline">Tazama filamu hii bure bila makato.</span>
+</div>
+</div>
+<button class="shrink-0 bg-surface-container-highest text-secondary hover:text-on-surface font-label-badge text-label-badge uppercase font-bold px-2.5 py-1.5 rounded" type="button">
+        Washa VIP
+      </button>
+</div>
+</div>
+<!-- 4. Synopsis & Movie Story Details -->
+<div class="px-space-md pt-space-lg flex flex-col gap-space-sm">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Hadithi kwa Ufupi</span>
+<span class="font-body-sm text-body-sm text-outline">Story Synopsis &amp; Cast</span>
+</div>
+<div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-3">
+<p class="font-body-md text-body-md text-on-surface leading-relaxed">
+        Baada ya kunusurika kifo kwenye daraja la Dhaka, afisa komando Tyler Rake (Chris Hemsworth) anatumwa kwenye oparesheni nyingine nzito jijini Dar es Salaam. Kazi yake ni kumwokoa binti wa mfanyabiashara mkubwa aliyetekwa na genge katili la kimataifa lililojificha maeneo ya bandari na visiwa vya jirani.
+      </p>
+<!-- Meta Cast Table -->
+<div class="flex flex-col gap-2 pt-2 text-body-sm font-body-sm">
+<div class="flex items-start">
+<span class="w-24 text-outline shrink-0 font-medium">Waigizaji:</span>
+<span class="text-on-surface">Chris Hemsworth, Golshifteh Farahani, Idris Sultan, Adam Neill.</span>
+</div>
+<div class="flex items-start">
+<span class="w-24 text-outline shrink-0 font-medium">Mwongozaji:</span>
+<span class="text-on-surface">Sam Hargrave</span>
+</div>
+<div class="flex items-start">
+<span class="w-24 text-outline shrink-0 font-medium">Studio ya Sauti:</span>
+<span class="text-on-surface">GIFTEDpro Swahili Audio Lab (Mikocheni, Dar)</span>
+</div>
+<div class="flex items-start">
+<span class="w-24 text-outline shrink-0 font-medium">Ubora:</span>
+<span class="text-secondary font-label-badge text-label-badge">Ultra HD 4K • Swahili Commentary</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 5. Related DJ Action Movies Rail -->
+<div class="pt-space-lg pb-space-lg flex flex-col gap-space-sm">
+<div class="px-space-md flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface">Filamu za Vitendo za Ma-DJ</span>
+<span class="font-body-sm text-body-sm text-outline">Related DJ Action Hits</span>
+</div>
+<a class="font-label-badge text-label-badge text-primary hover:underline uppercase tracking-wider flex items-center gap-0.5" href="#">
+        Zote <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</a>
+</div>
+<!-- Horizontal Carousel Rail with DJ Tags -->
+<div class="flex gap-space-sm overflow-x-auto px-space-md pb-2 no-scrollbar snap-x">
+<!-- Related Item 1 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-1.5 cursor-pointer group">
+<div class="relative w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="Action movie poster featuring martial arts warrior holding weapons under rain drenched neon cityscape with fierce dark cinematic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADoOI_plc8T3ljGNbeGN8N7ULnbsMBrJp0aFNFoa_nwIu8WoTvSMp6MM9cGcHcyPJaEYaRZjFHKpeRPuYdxCPZpd8u2aDcXayg59CwHMEiEulMbHsO55IV0YKXoU51ngHkz-IoKEQFzc-mPBkhjjvy8Uif-1qzdZckvuPpRT7Y7Sj6Yy_J0kGzYaBNiZ4Oo1H5QbWoiJkw-RKwjTz5lRykIaog8W0ZbS6HiasKIN1n1xDUl5HB2Cmd"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent"></div>
+<div class="absolute top-2 left-2">
+<span class="bg-surface-container-lowest/90 text-secondary font-label-badge text-label-badge px-1.5 py-0.5 rounded font-bold">DJ AFRO</span>
+</div>
+<div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+<span class="text-secondary font-label-price text-label-price">TSh 1,200</span>
+<div class="flex items-center text-secondary text-[11px]">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.9
+            </div>
+</div>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface truncate leading-tight">John Wick: Sura ya 4</span>
+<span class="font-label-badge text-label-badge text-outline uppercase">Vitendo • Saa 2:49</span>
+</div>
+<!-- Related Item 2 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-1.5 cursor-pointer group">
+<div class="relative w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="High adrenaline tactical raid action movie poster with SWAT assault team breaching dynamic smoky compound with red emergency beacons" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfSXnJNgpjhk6eser83MLojUOecKADGWlL7ob_olwcd1YHzVjUMlJM4ter_6WYk_WY_00FwKOYTWxz2ta_OvvX6BDaplkO5CTvCG7Hh9F4pdQZI9csAKHt9X3PC8fHvlgyJZcHp3Pp4RbYuwp2UuLV-h9-L6R1Fb6lN4mRzmheP6bHAFK4d9o0e_OgWLwkhBjGfBmEGw2zALsMtzkDfC3Y57GieI5_q-7rzcgM0AuF6LeHRBL-CyVd"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent"></div>
+<div class="absolute top-2 left-2">
+<span class="bg-surface-container-lowest/90 text-on-surface font-label-badge text-label-badge px-1.5 py-0.5 rounded font-bold">DJ MURPHY</span>
+</div>
+<div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+<span class="text-secondary font-label-price text-label-price">TSh 1,500</span>
+<div class="flex items-center text-secondary text-[11px]">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.8
+            </div>
+</div>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface truncate leading-tight">The Raid 2: Mapambano</span>
+<span class="font-label-badge text-label-badge text-outline uppercase">Ukatili • Saa 2:30</span>
+</div>
+<!-- Related Item 3 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-1.5 cursor-pointer group">
+<div class="relative w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="Action thriller movie poster showing an intense vigilante standing stoic against atmospheric European street sunset with deep contrast tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAETbOZYlBwdiNF7-nTPWg005C6SAcYx1lMsmSxdPC_1y0IANnbQJKzP3kaLAmfqnHPMP4_vZZm_6cmkCYd28QOjBI2wRpCrwvDDeydsQ9l6tpplPQrBSExpB8KjNv_eDKP3dDtsqISyKIXE8rUyKv9Sq4v1s-13Hv5zMBcTikam084iX_ToJmdqebNQixMscvD3tkIxWEdgPOaTk5QL1eBUgYrMUIRRoRxkfFUl-v7S3aqZjjYGMGq"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent"></div>
+<div class="absolute top-2 left-2">
+<span class="bg-surface-container-lowest/90 text-tertiary font-label-badge text-label-badge px-1.5 py-0.5 rounded font-bold">DJ BLACK</span>
+</div>
+<div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+<span class="text-secondary font-label-price text-label-price">TSh 1,200</span>
+<div class="flex items-center text-secondary text-[11px]">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.7
+            </div>
+</div>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface truncate leading-tight">Equalizer 3: Haki</span>
+<span class="font-label-badge text-label-badge text-outline uppercase">Kisasi • Saa 1:49</span>
+</div>
+<!-- Related Item 4 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-1.5 cursor-pointer group">
+<div class="relative w-full aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="Spy thriller movie poster with high speed motorcycle chase through ancient city streets with motion blur and cinematic lens flares" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHy6HVqlCylM-hnnfp_xt0p_afZuw8W1dlNJS7maW03jNRBAuZdeiIOpgv9jyneLexK41m8BYD7a0FBU2gI2mia0hdgrkuglxmoPjDmlcoXyQr-g6i0n4ldBv9cGgDNGcDDRC9UXGtUK6PtxAFReCezZHA2O4gH2-IOkLsMy6XoOg-O4kW3qycO34I6FpfjwGEj9yDW3WtNi504ZO_IGgfiIJ8PN8WxeGXC47rU2F7UEJdR0CsQjMV"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-transparent to-transparent"></div>
+<div class="absolute top-2 left-2">
+<span class="bg-surface-container-lowest/90 text-secondary font-label-badge text-label-badge px-1.5 py-0.5 rounded font-bold">DJ SMITH</span>
+</div>
+<div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+<span class="text-secondary font-label-price text-label-price">TSh 1,500</span>
+<div class="flex items-center text-secondary text-[11px]">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.8
+            </div>
+</div>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface truncate leading-tight">Mission Impossible 7</span>
+<span class="font-label-badge text-label-badge text-outline uppercase">Ujasusi • Saa 2:43</span>
+</div>
+</div>
+</div>
+<!-- Micro-interaction JS -->
+<script>
+    (function() {
+      // DJ selector interactivity
+      const cards = document.querySelectorAll('#djGroupSelector .dj-card');
+      cards.forEach(card => {
+        card.addEventListener('click', function(e) {
+          if (e.target.closest('.preview-audio-btn')) return;
+          cards.forEach(c => {
+            c.classList.remove('bg-surface-container-high');
+            c.classList.add('bg-surface-container');
+            const radio = c.querySelector('.dj-radio');
+            const inner = radio.firstElementChild;
+            radio.className = 'dj-radio w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 mt-1';
+            inner.className = 'w-2 h-2 rounded-full bg-transparent';
+          });
+          this.classList.remove('bg-surface-container');
+          this.classList.add('bg-surface-container-high');
+          const radio = this.querySelector('.dj-radio');
+          const inner = radio.firstElementChild;
+          radio.className = 'dj-radio w-5 h-5 rounded-full bg-primary-container flex items-center justify-center shrink-0 mt-1';
+          inner.className = 'w-2 h-2 rounded-full bg-on-primary-container';
+        });
+      });
+
+      // Watchlist toggle state
+      const saveBtn = document.getElementById('saveListBtn');
+      const saveIcon = document.getElementById('saveListIcon');
+      let saved = false;
+      if (saveBtn && saveIcon) {
+        saveBtn.addEventListener('click', () => {
+          saved = !saved;
+          if (saved) {
+            saveIcon.textContent = 'bookmark_added';
+            saveIcon.style.fontVariationSettings = "'FILL' 1";
+            saveBtn.classList.add('text-secondary');
+          } else {
+            saveIcon.textContent = 'bookmark_add';
+            saveIcon.style.fontVariationSettings = "'FILL' 0";
+            saveBtn.classList.remove('text-secondary');
+          }
+        });
+      }
+
+      // 15s audio preview button toast feedback
+      const previewBtn = document.querySelector('.preview-audio-btn');
+      if (previewBtn) {
+        previewBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const text = previewBtn.querySelector('span:nth-child(2)');
+          const original = text.textContent;
+          text.textContent = 'Inacheza DJ Afro Sauti...';
+          setTimeout(() => {
+            text.textContent = original;
+          }, 3000);
+        });
+      }
+    })();
+  </script>
+</div></main></body></html>

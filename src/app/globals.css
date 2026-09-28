@@ -1,26 +1,177 @@
 @import "tailwindcss";
 
+@theme {
+  --color-canvas: #000000;
+  --color-canvas-base: #08090C;
+  --color-surface: #111318;
+  --color-surface-elevated: #181A21;
+  --color-surface-card: #121317;
+  --color-surface-hover: #1E2029;
+  --color-crimson: #E50914;
+  --color-crimson-core: #B11226;
+  --color-crimson-hover: #FF1E27;
+  --color-gold: #F59E0B;
+  --color-gold-vip: #D6A84F;
+  --color-green-tsh: #10B981;
+  --color-border-subtle: #262932;
+  --color-border-glass: rgba(255, 255, 255, 0.08);
+
+  --font-bebas: var(--font-bebas);
+  --font-manrope: var(--font-manrope);
+  --font-space: var(--font-space);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #08090c;
+  --foreground: #f5f5f5;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #08090c;
+  color: #f5f5f5;
+  font-family: var(--font-manrope), sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0c10;
+}
+::-webkit-scrollbar-thumb {
+  background: #262932;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e50914;
+}
+
+/* Utility glass & glow effects */
+.glow-crimson {
+  box-shadow: 0 0 28px -2px rgba(229, 9, 20, 0.4);
+}
+
+.glow-gold {
+  box-shadow: 0 0 28px -2px rgba(214, 168, 79, 0.35);
+}
+
+.glass-panel {
+  background: rgba(18, 19, 24, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-header {
+  background: rgba(8, 9, 12, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Hide scrollbar utility */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scrim Gradients for Cinematic Readability */
+.scrim-hero {
+  background: 
+    linear-gradient(180deg, rgba(8, 9, 12, 0.15) 0%, rgba(8, 9, 12, 0.5) 45%, rgba(8, 9, 12, 0.95) 85%, #08090C 100%),
+    linear-gradient(90deg, #08090C 0%, rgba(8, 9, 12, 0.88) 32%, rgba(8, 9, 12, 0.3) 70%, transparent 100%);
+}
+
+.scrim-bottom {
+  background: linear-gradient(180deg, transparent 0%, rgba(8, 9, 12, 0.8) 65%, #08090C 100%);
+}
+
+.scrim-card {
+  background: linear-gradient(180deg, transparent 25%, rgba(8, 9, 12, 0.65) 60%, rgba(8, 9, 12, 0.98) 100%);
+}
+
+/* GPU-Accelerated Animation Keyframes */
+@keyframes kenburns {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes billboardCrossfade {
+  from {
+    opacity: 0.15;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes modalFadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-kenburns {
+  animation: kenburns 30s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-billboard-fade {
+  animation: billboardCrossfade 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-enter {
+  animation: modalFadeScale 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-sheet-up {
+  animation: modalSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-slide-progress {
+  animation: slideProgress 6.5s linear forwards;
+}
+
+.animate-slide-progress.paused {
+  animation-play-state: paused;
 }
