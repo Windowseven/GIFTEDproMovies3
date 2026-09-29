@@ -1,0 +1,68 @@
+# =============================================================================
+# GIFTEDproMovies — Backend .gitignore
+# =============================================================================
+
+# Local Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+secrets/
+
+# Dependency Directories (Runtime-neutral)
+node_modules/
+vendor/
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Build Artifacts & Distribution Packages
+dist/
+build/
+out/
+target/
+bin/
+obj/
+*.egg-info/
+*.whl
+
+# Log Files & Debugging
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Test Coverage & Temporary Cache Directories
+coverage/
+.coverage
+.nyc_output/
+.pytest_cache/
+tmp/
+temp/
+.cache/
+
+# Local Database Files & SQLite Dumps
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql.gz
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# IDE & Editor Settings
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
