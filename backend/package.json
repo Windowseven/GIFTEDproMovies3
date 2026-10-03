@@ -1,0 +1,54 @@
+{
+  "name": "@giftedpromovies/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GIFTEDproMovies modular monolith backend",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "start:dev": "tsx watch src/main.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test:compile": "tsc -p tsconfig.test.json && cp -R tests/fixtures/migrations .test-dist/tests/fixtures/",
+    "test": "pnpm run test:compile && node --test .test-dist/tests/*.test.js",
+    "test:db": "pnpm run test:compile && node --test .test-dist/tests/database.integration.test.js",
+    "db:fixture:generate": "drizzle-kit generate --config=drizzle.fixture.config.ts",
+    "db:fixture:migrate": "node scripts/migrate-fixture.mjs",
+    "db:fixture:check": "pnpm run db:fixture:migrate && pnpm run db:fixture:migrate"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.1",
+    "@nestjs/common": "^12.1.1",
+    "@nestjs/core": "^12.1.1",
+    "@nestjs/platform-fastify": "^12.1.1",
+    "@nestjs/swagger": "^12.0.2",
+    "argon2": "^0.45.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "dotenv": "^18.0.4",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.0",
+    "pino": "^9.14.0",
+    "reflect-metadata": "^0.2.2",
+    "resend": "^6.30.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@nestjs/testing": "^12.1.1",
+    "@types/node": "^24.19.0",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.11.0",
+    "fastify": "^5.12.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0"
+  }
+}
