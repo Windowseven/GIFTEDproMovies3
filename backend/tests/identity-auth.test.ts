@@ -38,6 +38,7 @@ test("AuthService.register forces role=customer and status=pending_verification"
   let insertedToken: any = null;
 
   const mockDb = {
+    transaction: async (cb: any) => cb(mockDb),
     select: () => ({
       from: () => ({
         where: () => ({

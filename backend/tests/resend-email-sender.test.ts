@@ -14,6 +14,16 @@ const baseConfig: EnvironmentConfig = {
   logLevel: "debug",
   emailFrom: "onboarding@resend.dev",
   emailProvider: "resend",
+  googleCallbackUrl: "http://localhost:8000/api/v1/auth/google/callback",
+  frontendUrl: "http://localhost:3000",
+  emailOutboxEncryptionKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  emailWorkerEnabled: false,
+  emailWorkerPollIntervalMs: 2000,
+  emailWorkerLeaseMs: 300000,
+  emailWorkerMaxAttempts: 5,
+  emailWorkerBaseBackoffMs: 2000,
+  emailWorkerMaxBackoffMs: 60000,
+  emailWorkerJitterMs: 500,
 };
 
 test("ResendEmailSender throws if sendEmail called without RESEND_API_KEY", async () => {

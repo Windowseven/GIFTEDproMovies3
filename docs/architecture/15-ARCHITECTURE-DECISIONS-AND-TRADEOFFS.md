@@ -35,6 +35,7 @@ This register indexes existing architectural decisions and makes their current s
 | ADR-027 | Purpose-based retention and non-cascading account deletion | **ACCEPTED** | Separate account PII, commercial, security/audit, and operational/transient data; preserve required records and delete/anonymize unnecessary PII where safe. Exact periods remain pending policy. | ARCH-002, 003, 010, 014, 016 |
 | ADR-028 | Production backup, restore, and recovery strategy | **ACCEPTED** | Automated protected PostgreSQL backups, access controls/encryption, documented restore, periodic restore tests, and failure monitoring. RPO/RTO values remain pending and must be demonstrated. Media recovery is separate. | ARCH-013, 014, 016 |
 | ADR-029 | Measurement-led performance and service targets | **ACCEPTED** | Instrument and manage API, database, frontend/network, media, and async performance; set targets from observed workload and production needs. No universal latency/SLA number is assumed. | ARCH-001, 004, 009, 010, 011, 016 |
+| ADR-030 | Google Sign-In via OAuth 2.0 / OpenID Connect (OIDC) with PKCE and dedicated identities table | **ACCEPTED** | Google acts solely as external IdP; GIFTEDproMovies DB is single authority for user ID, roles, and sessions; immutable provider subject mapping (`user_identities`); strict anti-takeover Case C boundary without auto-linking; signed HttpOnly state cookie (`gp_oauth_state`); lockout defense on unlinking. | ARCH-001, 002, 003, 004, 017 |
 
 ## Alternatives and trade-off handling
 

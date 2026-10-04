@@ -5,3 +5,5 @@ export * from "./sessions.schema.js";
 export * from "./capabilities.schema.js";
 export * from "./notifications.schema.js";
 export * from "./audit-events.schema.js";
+export * from "./user-identities.schema.js";
+export * from "./email-outbox.schema.js";

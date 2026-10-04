@@ -12,6 +12,7 @@
 *.crt
 *.pfx
 secrets/
+.google-e2e-session.json
 
 # Dependency Directories (Runtime-neutral)
 node_modules/

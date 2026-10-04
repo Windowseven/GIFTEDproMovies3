@@ -11,8 +11,13 @@ import { DRIZZLE_DATABASE } from "../../../infrastructure/database/database.toke
 import type { ApplicationDatabase } from "../../../infrastructure/database/database.module.js";
 import { usersTable, type UserRecord } from "../../../infrastructure/database/schemas/users.schema.js";
 import { authTokensTable } from "../../../infrastructure/database/schemas/auth-tokens.schema.js";
-import { EMAIL_SENDER } from "../../../infrastructure/email/email.tokens.js";
 import type { EmailSender } from "../../../infrastructure/email/email-sender.interface.js";
+import {
+  EmailOutboxService,
+  type EnqueueVerificationParams,
+  type EnqueuePasswordResetParams,
+} from "../../../infrastructure/email/email-outbox.service.js";
+import type { EmailOutboxRecord } from "../../../infrastructure/database/schemas/email-outbox.schema.js";
 import { PasswordHasherService } from "./password-hasher.service.js";
 import { SessionService } from "./session.service.js";
 import { DeviceService } from "./device.service.js";
@@ -39,20 +44,52 @@ export function sanitizeUser(user: UserRecord): SafeUser {
 
 @Injectable()
 export class AuthService {
+  private readonly outboxService: EmailOutboxService;
+
   constructor(
     @Inject(DRIZZLE_DATABASE)
     private readonly db: ApplicationDatabase,
-    @Inject(EMAIL_SENDER)
-    private readonly emailSender: EmailSender,
+    outboxOrEmail: EmailOutboxService,
     private readonly passwordHasher: PasswordHasherService,
     private readonly sessionService: SessionService,
     private readonly deviceService: DeviceService,
     private readonly audit: AuditService,
-  ) {}
+  ) {
+    if (outboxOrEmail && "enqueueVerificationEmail" in outboxOrEmail) {
+      this.outboxService = outboxOrEmail;
+    } else {
+      const emailSender = outboxOrEmail as unknown as EmailSender;
+      this.outboxService = {
+        enqueueVerificationEmail: async (params: EnqueueVerificationParams) => {
+          if (emailSender?.sendVerificationEmail) {
+            await emailSender.sendVerificationEmail(params.email, params.rawToken);
+          }
+          return { id: "compat-outbox-id" } as unknown as EmailOutboxRecord;
+        },
+        enqueuePasswordResetEmail: async (params: EnqueuePasswordResetParams) => {
+          if (emailSender?.sendPasswordResetEmail) {
+            await emailSender.sendPasswordResetEmail(params.email, params.rawToken);
+          }
+          return { id: "compat-outbox-id" } as unknown as EmailOutboxRecord;
+        },
+        cancelSupersededJobs: async () => {},
+      } as unknown as EmailOutboxService;
+    }
+  }
+
+  private async executeInTransaction<T>(
+    callback: (tx: ApplicationDatabase) => Promise<T>,
+  ): Promise<T> {
+    if (typeof this.db?.transaction === "function") {
+      return this.db.transaction(callback);
+    }
+    return callback(this.db);
+  }
 
   /**
    * Registers a new customer account.
    * Public registration strictly forces role = 'customer' and status = 'pending_verification'.
+   * Atomically commits user, verification token hash, and encrypted email outbox job.
    */
   async register(email: string, password: string): Promise<SafeUser> {
     const normalizedEmail = email.toLowerCase().trim();
@@ -69,43 +106,54 @@ export class AuthService {
 
     const passwordHash = await this.passwordHasher.hashPassword(password);
 
-    const [user] = await this.db
-      .insert(usersTable)
-      .values({
-        email: normalizedEmail,
-        passwordHash,
-        role: "customer",
-        status: "pending_verification",
-      })
-      .returning();
+    const createdUser = await this.executeInTransaction(async (tx) => {
+      const [user] = await tx
+        .insert(usersTable)
+        .values({
+          email: normalizedEmail,
+          passwordHash,
+          role: "customer",
+          status: "pending_verification",
+        })
+        .returning();
 
-    if (!user) {
-      throw new Error("Failed to create user");
-    }
+      if (!user) {
+        throw new Error("Failed to create user");
+      }
 
-    // Issue verification token
-    const rawToken = generateSecureToken(32);
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+      // Issue verification token
+      const rawToken = generateSecureToken(32);
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
-    await this.db.insert(authTokensTable).values({
-      userId: user.id,
-      type: "email_verification",
-      tokenHash,
-      expiresAt,
+      await tx.insert(authTokensTable).values({
+        userId: user.id,
+        type: "email_verification",
+        tokenHash,
+        expiresAt,
+      });
+
+      await this.outboxService.enqueueVerificationEmail(
+        {
+          userId: user.id,
+          email: user.email,
+          rawToken,
+        },
+        tx as ApplicationDatabase,
+      );
+
+      return user;
     });
 
-    await this.emailSender.sendVerificationEmail(user.email, rawToken);
-
     await this.audit.recordEvent({
-      actorId: user.id,
+      actorId: createdUser.id,
       action: "auth.register",
       resourceType: "user",
-      resourceId: user.id,
+      resourceId: createdUser.id,
       metadata: { email: normalizedEmail },
     });
 
-    return sanitizeUser(user);
+    return sanitizeUser(createdUser);
   }
 
   /**
@@ -179,31 +227,44 @@ export class AuthService {
 
     const now = new Date();
 
-    // Invalidate previous unused verification tokens
-    await this.db
-      .update(authTokensTable)
-      .set({ usedAt: now })
-      .where(
-        and(
-          eq(authTokensTable.userId, user.id),
-          eq(authTokensTable.type, "email_verification"),
-          isNull(authTokensTable.usedAt),
-        ),
+    // Atomic transaction: invalidate previous unused tokens, cancel superseded outbox jobs, issue fresh token, enqueue fresh outbox job
+    await this.executeInTransaction(async (tx) => {
+      // Invalidate previous unused verification tokens
+      await tx
+        .update(authTokensTable)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(authTokensTable.userId, user.id),
+            eq(authTokensTable.type, "email_verification"),
+            isNull(authTokensTable.usedAt),
+          ),
+        );
+
+      // Cancel previous pending/processing outbox jobs
+      await this.outboxService.cancelSupersededJobs(user.id, "email_verification", tx as ApplicationDatabase);
+
+      // Issue fresh token
+      const rawToken = generateSecureToken(32);
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(now.getTime() + VERIFICATION_TOKEN_TTL_MS);
+
+      await tx.insert(authTokensTable).values({
+        userId: user.id,
+        type: "email_verification",
+        tokenHash,
+        expiresAt,
+      });
+
+      await this.outboxService.enqueueVerificationEmail(
+        {
+          userId: user.id,
+          email: user.email,
+          rawToken,
+        },
+        tx as ApplicationDatabase,
       );
-
-    // Issue fresh token
-    const rawToken = generateSecureToken(32);
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(now.getTime() + VERIFICATION_TOKEN_TTL_MS);
-
-    await this.db.insert(authTokensTable).values({
-      userId: user.id,
-      type: "email_verification",
-      tokenHash,
-      expiresAt,
     });
-
-    await this.emailSender.sendVerificationEmail(user.email, rawToken);
 
     await this.audit.recordEvent({
       actorId: user.id,
@@ -236,6 +297,19 @@ export class AuthService {
         action: "auth.login.failed",
         resourceType: "user",
         metadata: { email: normalizedEmail, reason: "user_not_found" },
+        ipAddress,
+        userAgent,
+      });
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    if (!user.passwordHash) {
+      await this.audit.recordEvent({
+        actorId: user.id,
+        action: "auth.login.failed",
+        resourceType: "user",
+        resourceId: user.id,
+        metadata: { reason: "password_not_set" },
         ipAddress,
         userAgent,
       });
@@ -337,31 +411,44 @@ export class AuthService {
 
     const now = new Date();
 
-    // Invalidate previous unused password reset tokens
-    await this.db
-      .update(authTokensTable)
-      .set({ usedAt: now })
-      .where(
-        and(
-          eq(authTokensTable.userId, user.id),
-          eq(authTokensTable.type, "password_reset"),
-          isNull(authTokensTable.usedAt),
-        ),
+    // Atomic transaction: invalidate previous unused reset tokens, cancel superseded outbox jobs, issue fresh token, enqueue fresh outbox job
+    await this.executeInTransaction(async (tx) => {
+      // Invalidate previous unused password reset tokens
+      await tx
+        .update(authTokensTable)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(authTokensTable.userId, user.id),
+            eq(authTokensTable.type, "password_reset"),
+            isNull(authTokensTable.usedAt),
+          ),
+        );
+
+      // Cancel previous pending/processing outbox jobs
+      await this.outboxService.cancelSupersededJobs(user.id, "password_reset", tx as ApplicationDatabase);
+
+      // Issue fresh token (1 hour TTL)
+      const rawToken = generateSecureToken(32);
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+      await tx.insert(authTokensTable).values({
+        userId: user.id,
+        type: "password_reset",
+        tokenHash,
+        expiresAt,
+      });
+
+      await this.outboxService.enqueuePasswordResetEmail(
+        {
+          userId: user.id,
+          email: user.email,
+          rawToken,
+        },
+        tx as ApplicationDatabase,
       );
-
-    // Issue fresh token (1 hour TTL)
-    const rawToken = generateSecureToken(32);
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TOKEN_TTL_MS);
-
-    await this.db.insert(authTokensTable).values({
-      userId: user.id,
-      type: "password_reset",
-      tokenHash,
-      expiresAt,
     });
-
-    await this.emailSender.sendPasswordResetEmail(user.email, rawToken);
 
     await this.audit.recordEvent({
       actorId: user.id,

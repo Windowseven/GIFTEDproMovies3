@@ -92,3 +92,13 @@ export class GrantCapabilityDto {
   @IsNotEmpty()
   capability!: string;
 }
+
+export class LinkGoogleDto {
+  @IsString({ message: "Authorization code must be a string" })
+  @IsNotEmpty({ message: "Authorization code is required" })
+  code!: string;
+
+  @IsString({ message: "State must be a string" })
+  @IsNotEmpty({ message: "State is required" })
+  state!: string;
+}

@@ -8,6 +8,20 @@
       "when": 1791049281780,
       "tag": "0000_hard_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791067996689,
+      "tag": "0001_sharp_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791100000000,
+      "tag": "0002_quiet_outbox",
+      "breakpoints": true
     }
   ]
 }

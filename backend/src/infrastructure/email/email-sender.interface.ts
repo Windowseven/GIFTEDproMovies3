@@ -6,7 +6,7 @@ export interface EmailMessage {
 }
 
 export interface EmailSender {
-  sendEmail(message: EmailMessage): Promise<void>;
+  sendEmail(message: EmailMessage): Promise<{ messageId?: string } | void>;
   sendVerificationEmail(to: string, rawToken: string): Promise<void>;
   sendPasswordResetEmail(to: string, rawToken: string): Promise<void>;
 }

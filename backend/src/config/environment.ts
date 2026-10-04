@@ -15,6 +15,18 @@ export interface EnvironmentConfig {
   readonly resendApiKey?: string;
   readonly emailFrom: string;
   readonly emailProvider: "resend" | "in_memory";
+  readonly googleClientId?: string;
+  readonly googleClientSecret?: string;
+  readonly googleCallbackUrl: string;
+  readonly frontendUrl: string;
+  readonly emailOutboxEncryptionKey: string;
+  readonly emailWorkerEnabled: boolean;
+  readonly emailWorkerPollIntervalMs: number;
+  readonly emailWorkerLeaseMs: number;
+  readonly emailWorkerMaxAttempts: number;
+  readonly emailWorkerBaseBackoffMs: number;
+  readonly emailWorkerMaxBackoffMs: number;
+  readonly emailWorkerJitterMs: number;
 }
 
 export class InvalidEnvironmentError extends Error {
@@ -135,8 +147,26 @@ function parseLogLevel(value: string | undefined): LogLevel {
   return level as LogLevel;
 }
 
-function parseEmailFrom(env: NodeJS.ProcessEnv): string {
+function parseEmailFrom(
+  env: NodeJS.ProcessEnv,
+  appEnvironment: AppEnvironment,
+): string {
   const raw = env.EMAIL_FROM?.trim();
+  if (appEnvironment === "production") {
+    if (!raw || raw.length === 0) {
+      throw new InvalidEnvironmentError(
+        "EMAIL_FROM",
+        "is required in production and must specify a verified project-owned sending domain email",
+      );
+    }
+    if (raw.toLowerCase().includes("@resend.dev")) {
+      throw new InvalidEnvironmentError(
+        "EMAIL_FROM",
+        "cannot use development sender (@resend.dev) in production; configure a verified project-owned sending domain",
+      );
+    }
+    return raw;
+  }
   return raw && raw.length > 0 ? raw : "onboarding@resend.dev";
 }
 
@@ -151,6 +181,175 @@ function parseEmailProvider(
     return "resend";
   }
   return "in_memory";
+}
+
+function parseAbsoluteUrl(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  fallback: string,
+): string {
+  const raw = env[key]?.trim();
+  const candidate = raw && raw.length > 0 ? raw : fallback;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Protocol must be http or https");
+    }
+    return candidate;
+  } catch {
+    throw new InvalidEnvironmentError(
+      key,
+      "must be a valid absolute HTTP or HTTPS URL",
+    );
+  }
+}
+
+function parseFrontendUrl(
+  env: NodeJS.ProcessEnv,
+  appEnvironment: AppEnvironment,
+  corsOrigins: readonly string[],
+): string {
+  const raw = env.FRONTEND_URL?.trim();
+
+  // 1. Missing or empty handling
+  if (!raw || raw.length === 0) {
+    if (appEnvironment === "production") {
+      throw new InvalidEnvironmentError(
+        "FRONTEND_URL",
+        "is required in production and must be a trusted HTTPS origin",
+      );
+    }
+    return DEFAULT_DEVELOPMENT_ORIGIN;
+  }
+
+  // 2. Reject dangerous schemes or control characters
+  if (
+    /^(javascript|data|vbscript|file|about):/i.test(raw) ||
+    raw.startsWith("//") ||
+    raw.includes("\r") ||
+    raw.includes("\n")
+  ) {
+    throw new InvalidEnvironmentError(
+      "FRONTEND_URL",
+      "contains an invalid or dangerous URL scheme or characters",
+    );
+  }
+
+  // 3. Absolute URL parsing
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new InvalidEnvironmentError(
+      "FRONTEND_URL",
+      "must be a valid absolute HTTP or HTTPS URL",
+    );
+  }
+
+  // 4. Scheme validation
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new InvalidEnvironmentError(
+      "FRONTEND_URL",
+      "protocol must be http: or https:",
+    );
+  }
+
+  // 5. Reject credentials
+  if (parsed.username || parsed.password) {
+    throw new InvalidEnvironmentError(
+      "FRONTEND_URL",
+      "cannot contain username or password credentials",
+    );
+  }
+
+  // 6. Reject query parameters and fragments
+  if (parsed.search || parsed.hash) {
+    throw new InvalidEnvironmentError(
+      "FRONTEND_URL",
+      "cannot contain query strings or URL fragments",
+    );
+  }
+
+  // 7. Reject sub-paths (must be pure origin)
+  if (parsed.pathname !== "" && parsed.pathname !== "/") {
+    throw new InvalidEnvironmentError(
+      "FRONTEND_URL",
+      "must be an origin URL without sub-paths",
+    );
+  }
+
+  // 8. Production security constraints
+  if (appEnvironment === "production") {
+    if (parsed.protocol !== "https:") {
+      throw new InvalidEnvironmentError(
+        "FRONTEND_URL",
+        "must use HTTPS in production",
+      );
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local")
+    ) {
+      throw new InvalidEnvironmentError(
+        "FRONTEND_URL",
+        "cannot point to localhost or loopback in production",
+      );
+    }
+
+    if (!corsOrigins.includes(parsed.origin)) {
+      throw new InvalidEnvironmentError(
+        "FRONTEND_URL",
+        `origin ${parsed.origin} must be included in CORS_ORIGINS in production`,
+      );
+    }
+  }
+
+  return parsed.origin;
+}
+
+const TEST_OUTBOX_ENCRYPTION_KEY =
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+function parseOutboxEncryptionKey(
+  env: NodeJS.ProcessEnv,
+  appEnvironment: AppEnvironment,
+): string {
+  const raw = env.EMAIL_OUTBOX_ENCRYPTION_KEY?.trim();
+  if (!raw || raw.length === 0) {
+    if (appEnvironment === "test") {
+      return TEST_OUTBOX_ENCRYPTION_KEY;
+    }
+    throw new InvalidEnvironmentError(
+      "EMAIL_OUTBOX_ENCRYPTION_KEY",
+      `is required in ${appEnvironment}; must be a 64-character hexadecimal string (256-bit key)`,
+    );
+  }
+
+  if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+    throw new InvalidEnvironmentError(
+      "EMAIL_OUTBOX_ENCRYPTION_KEY",
+      "must be exactly 64 hexadecimal characters (256-bit key)",
+    );
+  }
+
+  return raw.toLowerCase();
+}
+
+function parseBoolean(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const raw = env[key]?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return fallback;
+  if (raw === "true" || raw === "1") return true;
+  if (raw === "false" || raw === "0") return false;
+  throw new InvalidEnvironmentError(key, "must be a boolean (true or false)");
 }
 
 export function loadEnvironment(
@@ -191,25 +390,68 @@ export function loadEnvironment(
   const emailProvider = parseEmailProvider(env);
   const resendApiKey = env.RESEND_API_KEY?.trim() || undefined;
 
-  if (rawEnvironment === "production" && emailProvider === "resend" && !resendApiKey) {
-    throw new InvalidEnvironmentError(
-      "RESEND_API_KEY",
-      "is required in production when email provider is resend",
-    );
+  const googleClientId = env.GOOGLE_CLIENT_ID?.trim() || undefined;
+  const googleClientSecret = env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+  const googleCallbackUrl = parseAbsoluteUrl(
+    env,
+    "GOOGLE_CALLBACK_URL",
+    "http://localhost:8000/api/v1/auth/google/callback",
+  );
+
+  if (rawEnvironment === "production") {
+    if (googleClientId && !googleClientSecret) {
+      throw new InvalidEnvironmentError(
+        "GOOGLE_CLIENT_SECRET",
+        "is required in production when GOOGLE_CLIENT_ID is provided",
+      );
+    }
+    if (googleClientSecret && !googleClientId) {
+      throw new InvalidEnvironmentError(
+        "GOOGLE_CLIENT_ID",
+        "is required in production when GOOGLE_CLIENT_SECRET is provided",
+      );
+    }
+    if (googleClientId && !googleCallbackUrl.startsWith("https://")) {
+      throw new InvalidEnvironmentError(
+        "GOOGLE_CALLBACK_URL",
+        "must use HTTPS in production",
+      );
+    }
+  }
+
+  const corsOrigins = parseOrigins(env, rawEnvironment);
+  const databasePoolMax = parseInteger(
+    env,
+    "DB_POOL_MAX",
+    rawEnvironment === "production" ? undefined : DEFAULT_DEVELOPMENT_POOL_MAX,
+    1,
+    100,
+  );
+  const frontendUrl = parseFrontendUrl(env, rawEnvironment, corsOrigins);
+  const emailOutboxEncryptionKey = parseOutboxEncryptionKey(env, rawEnvironment);
+  const emailFrom = parseEmailFrom(env, rawEnvironment);
+
+  if (rawEnvironment === "production") {
+    if (emailProvider === "in_memory") {
+      throw new InvalidEnvironmentError(
+        "EMAIL_PROVIDER",
+        "cannot be 'in_memory' in production; must configure a valid email provider (resend)",
+      );
+    }
+    if (emailProvider === "resend" && !resendApiKey) {
+      throw new InvalidEnvironmentError(
+        "RESEND_API_KEY",
+        "is required in production when email provider is resend",
+      );
+    }
   }
 
   return {
     appEnvironment: rawEnvironment,
     port: parseInteger(env, "PORT", 8000, 1, 65_535),
     databaseUrl,
-    corsOrigins: parseOrigins(env, rawEnvironment),
-    databasePoolMax: parseInteger(
-      env,
-      "DB_POOL_MAX",
-      rawEnvironment === "production" ? undefined : DEFAULT_DEVELOPMENT_POOL_MAX,
-      1,
-      100,
-    ),
+    corsOrigins,
+    databasePoolMax,
     trustedProxyCidrs: parseTrustedProxyCidrs(env),
     requestBodyLimitBytes: parseInteger(
       env,
@@ -220,7 +462,59 @@ export function loadEnvironment(
     ),
     logLevel: parseLogLevel(env.LOG_LEVEL),
     resendApiKey,
-    emailFrom: parseEmailFrom(env),
+    emailFrom,
     emailProvider,
+    googleClientId,
+    googleClientSecret,
+    googleCallbackUrl,
+    frontendUrl,
+    emailOutboxEncryptionKey,
+    emailWorkerEnabled: parseBoolean(
+      env,
+      "EMAIL_WORKER_ENABLED",
+      rawEnvironment !== "test",
+    ),
+    emailWorkerPollIntervalMs: parseInteger(
+      env,
+      "EMAIL_WORKER_POLL_INTERVAL_MS",
+      2000,
+      100,
+      60_000,
+    ),
+    emailWorkerLeaseMs: parseInteger(
+      env,
+      "EMAIL_WORKER_LEASE_MS",
+      300_000,
+      5_000,
+      1_800_000,
+    ),
+    emailWorkerMaxAttempts: parseInteger(
+      env,
+      "EMAIL_WORKER_MAX_ATTEMPTS",
+      5,
+      1,
+      20,
+    ),
+    emailWorkerBaseBackoffMs: parseInteger(
+      env,
+      "EMAIL_WORKER_BASE_BACKOFF_MS",
+      2000,
+      500,
+      60_000,
+    ),
+    emailWorkerMaxBackoffMs: parseInteger(
+      env,
+      "EMAIL_WORKER_MAX_BACKOFF_MS",
+      60_000,
+      1000,
+      600_000,
+    ),
+    emailWorkerJitterMs: parseInteger(
+      env,
+      "EMAIL_WORKER_JITTER_MS",
+      500,
+      0,
+      5000,
+    ),
   };
 }
