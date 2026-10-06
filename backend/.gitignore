@@ -55,6 +55,7 @@ temp/
 
 # Local Database Files & SQLite Dumps
 .disposable_pg/
+.pg_test_cluster/
 *.sqlite
 *.sqlite3
 *.db
