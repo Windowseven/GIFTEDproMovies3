@@ -299,3 +299,26 @@ test("CapabilitiesGuard: Checks specific capability on media_team staff member",
       err.message.includes("Capabilities apply to staff only"),
   );
 });
+
+test("CapabilitiesGuard: Enforces CONTENT_EDIT capability on metadata editing endpoints", async () => {
+  const reflector = createMockReflector({ [CAPABILITIES_KEY]: "CONTENT_EDIT" });
+  const mockAccountService = {
+    getUserCapabilities: async (userId: string) =>
+      userId === "staff-editor" ? ["CONTENT_EDIT"] : ["CONTENT_CREATE"],
+  } as any;
+
+  const guard = new CapabilitiesGuard(reflector, mockAccountService);
+
+  // Staff with CONTENT_EDIT capability
+  const staffEditor: any = { user: { id: "staff-editor", role: "media_team" } };
+  assert.equal(await guard.canActivate(createMockExecutionContext(staffEditor)), true);
+
+  // Staff without CONTENT_EDIT capability
+  const staffCreatorOnly: any = { user: { id: "staff-creator-only", role: "media_team" } };
+  await assert.rejects(
+    async () => await guard.canActivate(createMockExecutionContext(staffCreatorOnly)),
+    (err: unknown) =>
+      err instanceof ForbiddenException &&
+      err.message.includes("CONTENT_EDIT"),
+  );
+});

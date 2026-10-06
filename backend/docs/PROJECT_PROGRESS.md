@@ -119,3 +119,127 @@
   - [x] Quality Gates: `pnpm run build` (PASS), `pnpm run typecheck` (PASS), `pnpm run lint` (PASS), `pnpm run test` (127/127 PASS).
   - [x] Phase 2 Closure: **PHASE 2 — COMPLETE / APPROVED**. Ready to advance to Phase 3.
 
+---
+
+## Phase 3: Catalog, Taxonomy Governance & Content Lifecycle
+
+### Phase 3A: Domain Design & Decisions
+* **Status:** **APPROVED BY PRODUCT OWNER**
+* **Milestones Completed:**
+  - [x] Architecture Specification: Authored `docs/architecture/PHASE_3_DOMAIN_DESIGN_AND_ARCHITECTURE.md` (and `ARCH-018`) detailing domain entities, relationships, state machines, readiness criteria, and governance rules with 100% portable plain-text ASCII diagrams.
+  - [x] Final Archive Restoration Model: Replaced direct restoration with strict multi-step re-entry (`ARCHIVED` -> `DRAFT` -> `PENDING_REVIEW` -> `PUBLISHED` / auto-publish) requiring 100% publication readiness re-validation.
+  - [x] Final Series Publication Invariant: Mandated that Series cannot publish as an empty "Upcoming" card; initial publication strictly requires Season 1 + Episode 1 with ready streaming & download media.
+  - [x] Final Movie Edition Failure Model: Codified Case A (healthy secondary edition promoted to default; movie stays published) and Case B (no ready edition exists; movie transitions immediately to `UNPUBLISHED` while preserving customer entitlements).
+  - [x] Submission Validation vs. Publication Readiness: Established clear architectural separation between editorial intake submission (completeness >= 80% + primary media passes) and authoritative server publication readiness (100% 9/9 checks verified inside publish transaction).
+  - [x] Minimal Hierarchical Series Lifecycle: Defined lightweight parent/child model separating Series container status from Episode playback availability (`is_available`), ensuring newly added draft episodes never unpublish the live series.
+  - [x] Rejection and Notification Ownership: Clarified `created_by`, `submitted_by`, and `assigned_to` responsibilities; preserved rejection review history; guaranteed that notification dispatch errors cannot roll back committed review decisions.
+  - [x] Database Referential Integrity: Mandated PostgreSQL `ON DELETE RESTRICT` constraints for categories, countries, and DJs; added smart deletion safeguard with safe deactivation.
+  - [x] ADR Status Governance: ADR-031, ADR-032, and ADR-033 maintained as `PROPOSED — PENDING PRODUCT OWNER REVIEW` in `docs/architecture/15-ARCHITECTURE-DECISIONS-AND-TRADEOFFS.md` awaiting final human approval.
+  - [x] Scope Containment: Zero production code, schema migrations, or database changes introduced. Stopped awaiting final human product-owner sign-off before Phase 3B.
+
+### Phase 3B: Database Schemas & Migrations
+* **Status:** **PHASE 3B ACCEPTED BY PRODUCT OWNER (OPTION C RESIDUAL RISK ACCEPTED)**
+* **Milestones Completed:**
+  - [x] PostgreSQL Enums: Implemented `content_type`, `content_status` (5-state: `draft`, `pending_review`, `published`, `unpublished`, `archived`), `episode_status` (`draft`, `published`, `archived`), and `media_status` (`pending`, `processing`, `ready`, `failed`). (Purged unapproved `pricing_model` enum).
+  - [x] Core Catalog Schemas:
+    - `categoriesTable`: Case-insensitive unique indexes on `lower(slug)` and `lower(name)`.
+    - `countriesTable`: Unique indexes on `upper(code)` and `lower(name)`.
+    - `djVoiceArtistsTable`: Case-insensitive unique index on `lower(slug)` and indexed `stage_name` (purged unapproved `tier` and `contract_type`).
+    - `contentTable`: Movies and series container, `code_id` unique, `slug` unique, 5-state lifecycle enum, audit fields (`created_by` ON DELETE RESTRICT for audit retention, `submitted_by`, `assigned_to`, `approved_by`), rejection note, and transition timestamps.
+    - `movieEditionsTable`: Compound unique index on `(movie_id, dj_id)` and partial unique index on `movie_id WHERE is_default = true` enforcing $\le 1$ default edition per movie at the database level.
+    - `seriesMetadataTable`: Metadata referencing `lead_dj_id` (`ON DELETE RESTRICT`) with zero commerce leakage.
+    - `seasonsTable`: Compound uniqueness on `(series_id, season_number)` and cascade deletion on series deletion.
+    - `episodesTable`: Compound uniqueness on `(season_id, episode_number)`, `is_available` boolean, and independent `episode_status`.
+    - `contentCategoriesTable` & `contentCountriesTable`: Composite primary keys and `ON DELETE RESTRICT` on taxonomy IDs.
+    - `contentReviewNotesTable`: Historical append-only review notes capturing `rejection_reason` across state transitions.
+    - `systemSettingsTable`: Platform configurations (`key` unique) supporting `publishingRequiresApproval`.
+  - [x] Forward Migration Generation & Live Application:
+    - Initial forward migration `0003_spotty_absorbing_man.sql` created catalog entities.
+    - Remediation forward migration `0004_chunky_clint_barton.sql` cleanly dropped `series_metadata.pricing_model`, enum `pricing_model`, and `dj_voice_artists.tier` / `contract_type`.
+    - Verified against live isolated PostgreSQL test cluster.
+  - [x] Functional Database Integration Testing (`tests/catalog-database.integration.test.ts`):
+    - 24 test assertions covering positive creation, relationships, and negative constraints (unique indexes, enums, `ON DELETE RESTRICT`, partial indexes, 0-default draft support, and settings key uniqueness). 24/24 PASS.
+  - [x] Security Attack & Concurrency Testing (`tests/catalog-security-attacks.test.ts`):
+    - 10 security test scenarios covering Attacks A through I (double default edition race, taxonomy deletion race, slug race, junction race, invalid FK attachment, lifecycle enum injection, media status enum injection, polymorphic cross-type attachment integrity, and account deletion audit retention). 10/10 PASS.
+  - [x] Full Automated Regression Test Suite (`pnpm run test`):
+    - 162 total test assertions: 161 PASS, 0 FAIL, 1 cleanly skipped.
+  - [x] Quality Gates:
+    - `pnpm run build`: PASS (Exit 0)
+    - `pnpm run typecheck`: PASS (Exit 0)
+    - `pnpm run lint`: PASS (Exit 0)
+  - [x] Strict Scope Containment: Zero controllers, services, public APIs, or commerce tables introduced.
+  - [x] ADR-034 Accepted: Polymorphic Relationship Integrity via Transactional Domain Enforcement (Option C) approved by Product Owner; direct SQL cross-type residual risk explicitly documented.
+
+### Phase 3C: Services, Lifecycle State Machines & Business Logic
+* **Status:** **PHASE 3C STAGE 3 — FINAL EVIDENCE VERIFIED (READY FOR PRODUCT OWNER ACCEPTANCE)**
+* **Milestones Completed:**
+  - [x] Stage 0 & 1 Design Package completed: Module boundaries, service contracts, repository pattern, database privilege model, and test matrix.
+  - [x] Stage 1 Design Refinement (`docs/architecture/PHASE_3C_STAGE_1_REFINED_DESIGN.md`): Review Items A–D resolved and approved by Product Owner with 10 mandatory implementation refinements.
+  - [x] Stage 2 Implementation (`src/modules/catalog/`):
+    - [x] Polymorphic Domain Integrity: Negative enforcement against cross-type attachments (`Movie` -> `series_metadata`/`seasons`, `Series` -> `movie_editions`), positive attachments with canonical row locking.
+    - [x] Canonical Row Locking Protocol: Single lock order established (`content FOR UPDATE` -> `movie_editions FOR UPDATE ORDER BY id ASC`) for edition mutations; hierarchical key share locking (`content FOR KEY SHARE` -> `seasons FOR KEY SHARE` -> authoritative re-read) for episode attachments.
+    - [x] Content Discriminator Immutability: `content_type` strictly excluded from update DTOs, interfaces, and repository update helpers.
+    - [x] Authoritative 9/9 Publication Readiness Engine: Evaluated strictly in-transaction before transition to `published`.
+    - [x] Series Initial Gate: Enforces Season 1 + Episode 1 with ready media before initial series publication.
+    - [x] Movie Default Edition Outage Fallback: Case A promotes secondary ready edition; Case B unpublishes movie if no ready edition remains.
+    - [x] Strict Archive Restoration: Enforces `ARCHIVED` -> `DRAFT` only; direct restoration to `PUBLISHED` rejected.
+    - [x] Rejection Workflow: Requires non-empty written reason, transitions to `draft`, inserts append-only review note, emits in-transaction audit event, triggers post-commit notification via existing `NotificationsService` without new queue infrastructure.
+    - [x] In-Transaction Audit Atomicity: Extended `AuditService.recordEvent({ tx, failClosed: true })`. Write failures throw and trigger PostgreSQL `ROLLBACK` of business mutation.
+    - [x] Taxonomy Safeguards: Smart deletion blocks deletion of referenced entities (`409 TAXONOMY_IN_USE`) and recommends safe deactivation (`is_active: false`).
+    - [x] Staff REST Controllers & Security Guards: Endpoints protected by `SessionAuthGuard`, `RolesGuard`, and `CapabilitiesGuard` (`CONTENT_CREATE`, `CONTENT_EDIT`, `CONTENT_PUBLISH`, `CONTENT_ARCHIVE`, `TAXONOMY_MANAGE`).
+    - [x] Error Handling: Global `ApiExceptionFilter` returns canonical domain error envelopes with zero SQL/schema leaks.
+  - [x] Stage 3 Functional Verification & Evidence Gap Closure:
+    - [x] Comprehensive Functional Verification Test Suite (`tests/catalog-functional-verification.test.ts`): 37/37 tests PASS covering Domains A through J:
+      - Domain A: Lifecycle transitions, emergency unpublish, archive restoration strictly to draft, rejection reason required, review note creation.
+      - Domain B: Authoritative 9/9 publication readiness checklist with isolated negative testing of each criterion, separate movie publication prerequisite (`DEFAULT_EDITION_REQUIRED`), and ready movie publication.
+      - Domains C & D: Compound edition uniqueness, single default edition invariant, outage fallback Case A (promote secondary ready edition) and Case B (unpublish movie).
+      - Domain E: Series initial publication gate (Season 1 + Episode 1 ready media required, with Gap B fully verified across 9 explicit assertions for pending media) and subsequent draft episode resilience (no unpublishing of live series).
+      - Domain F: Taxonomy governance, case-insensitive collision detection (409 `SLUG_ALREADY_EXISTS`), unreferenced deletion, and referenced deletion blocking (409 `TAXONOMY_IN_USE`).
+      - Domain G: Review & approval workflow, Gap A verified (`publishingRequiresApproval = true` keeps ready content in `pending_review` with zero `CONTENT_PUBLISH` audit events and 1 `CONTENT_SUBMIT_REVIEW` event), auto-publishing (`publishingRequiresApproval = false`), rejection review note recording, and in-app author notification delivery.
+      - Domain H: Audit correctness, actorId/action/resource/metadata validation, and fail-closed transactional rollback on audit write failure.
+      - Domain I: Authorization & capabilities HTTP injection testing (401 unauthenticated, 403 customer, 403 unprivileged staff, 201 staff with capability, 201 admin).
+      - Domain J: Standard API error envelope `{ success: false, error: { code, message, timestamp, requestId } }`, canonical HTTP status codes, and sanitized 500 internal errors with zero SQL/schema leakage.
+    - [x] Full Regression Suite (`pnpm run test`): 223 tests total (222 PASS, 0 FAIL, 1 cleanly skipped).
+    - [x] Quality Gates:
+      - `pnpm run build`: PASS (Exit 0)
+      - `pnpm run typecheck`: PASS (Exit 0)
+      - `pnpm run lint`: PASS (Exit 0)
+  - [x] Scope Containment: Zero schema modifications, zero migrations, zero database triggers, zero commerce/playback/payment leakage, zero Redis/BullMQ/Kafka queues introduced.
+  - [x] Stage 4 Security & Integrity Adversarial Verification:
+    - [x] Comprehensive Adversarial Test Suite (`tests/catalog-stage4-adversarial.test.ts`): 26/26 attacks PASS across 15 threat categories against local PostgreSQL 16 test cluster.
+      - Category A (Attacks A.1–A.4): 401 unauthenticated, 403 customer horizontal IDOR, central status blocking for suspended/deactivated, central status blocking for pending verification.
+      - Category B (Attacks B.1–B.2): Staff capability boundaries enforced (`CONTENT_CREATE` unable to edit/publish/archive/manage taxonomy), role escalation payload tampering neutralized.
+      - Category C (Attacks C.1–C.3): Swapped parent/child season IDOR rejected (404), cross-movie default edition manipulation rejected (422), outage fallback cross-movie IDOR rejected (422).
+      - Category D (Attacks D.1–D.4): Polymorphic cross-type attachment blocked (movie editions on series, series metadata on movie, seasons on movie all return 422), `contentType` immutability verified.
+      - Category E (Attack E.1): Invalid lifecycle transitions strictly rejected with 400 `INVALID_LIFECYCLE_TRANSITION`.
+      - Category F (Attack F.1): 9-point publication readiness checklist strictly enforced; missing criteria enumerated in 422 error response.
+      - Category G (Attack G.1): Partial unique index `idx_movie_editions_single_default` verified in PostgreSQL (SQLSTATE 23505 on raw attempt to create 2 default editions).
+      - Category H (Attack H.1): Outage fallback Case A and Case B maintain exact default edition count and lifecycle invariants.
+      - Category I (Attack I.1): Series publication without Season 1 Episode 1 ready media strictly rejected (422).
+      - Category J (Attack J.1): In-use taxonomy deletion blocked (409 `TAXONOMY_IN_USE`).
+      - Category K (Attack K.1): `publishingRequiresApproval` system setting dynamically switches review queue vs auto-publish; unauthorized route access rejected (401/404).
+      - Category L (Attack L.1): Fail-closed audit failure verified to trigger complete transactional rollback.
+      - Category M (Attacks M.1–M.2): SQL injection payloads in title/slug safely parameterized without execution; unhandled 500 errors sanitized with zero database internals/relation leakage.
+      - Category N (Attack N.1): Concurrent default edition promotion race settled cleanly with 0 deadlocks (SQLSTATE 40P01) and deterministic serialization.
+      - Category O (Attack O.1): ADR-034 residual risk re-verified; application layer blocks cross-type writes; raw direct SQL write bypass confirms production requirement for database role restrictions.
+    - [x] Full Backend Regression Suite (`pnpm test`): 248 PASS / 0 FAIL / 1 SKIPPED across 249 tests.
+    - [x] Quality Gates: `pnpm run build` (PASS), `pnpm run typecheck` (PASS), `pnpm run lint` (PASS).
+    - [x] Findings: 0 Security Findings, 0 Integrity Findings, 0 Scope Violations.
+  - [x] Stage 5 Remediation Review & No-Finding Closure:
+    - [x] Comprehensive review of all 26 Stage 4 attack vectors and results.
+    - [x] Findings Classification: 25 vectors classified as Expected Behavior; 1 vector (Attack O.1) classified as Accepted Residual Risk (ADR-034 Option C).
+    - [x] Genuine Security Findings: 0. Genuine Integrity Findings: 0.
+    - [x] Production Code Remediation: NONE — NO REMEDIATION REQUIRED. Zero runtime source code or database schemas altered.
+    - [x] Formal Engineering Verdict: **STAGE 5 COMPLETE — NO REMEDIATION REQUIRED**. Ready for Stage 6 authorization.
+  - [x] Stage 6 Final Architecture, Security, Integrity & Scope Audit:
+    - [x] Comprehensive independent verification across all 26 required audit areas.
+    - [x] Confirmed zero genuine security findings, zero integrity findings, zero scope contamination, and zero documentation discrepancies.
+    - [x] ADR-034 direct-SQL residual risk re-verified and documented. Quality gates 100% green.
+    - [x] Formal Engineering Verdict: **STAGE 6 FINAL AUDIT COMPLETE — NO FINDINGS — READY FOR STAGE 7**.
+  - [x] Stage 7 Product Owner Acceptance & Formal Closure:
+    - [x] Final Product Owner acceptance review of complete Phase 3C delivery across Stages 0 through 6.
+    - [x] All 7 stage gates verified with executable repository evidence.
+    - [x] 0 blockers, 0 security/integrity findings, 0 scope contamination.
+    - [x] ADR-034 direct-SQL residual risk explicitly accepted.
+    - [x] Acceptance Date: **2026-10-06**.
+    - [x] Formal Status: **PHASE 3C — PRODUCT OWNER ACCEPTED AND CLOSED**.

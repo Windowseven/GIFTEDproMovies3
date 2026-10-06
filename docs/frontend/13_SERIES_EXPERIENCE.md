@@ -479,23 +479,19 @@ The final playback/progress system belongs to the future backend/player architec
 
 ---
 
-# 21. DJ / Translator Versions
+# 21. Translating DJ & Lead Voice Artist
 
-If episodes support different DJ/Translator versions, the UI must clearly represent them.
+In GIFTEDproMovies episodic titles, translating voice continuity is typically anchored by a single dedicated voice artist:
 
-Example:
+* **Series Lead DJ (`leadDjName`)**: Displayed on the series hero card and overview (e.g. `leadDjName: "DJ Afro Amigo"`), providing recognizable voice continuity across entire seasons.
+* **Episode DJ (`djName`)**: Individual episodes specify the translating voice artist attached to the audio track.
 
 ```text
-Episode 4
-
-Version
-
-[ DJ Mack ]
-[ DJ John ]
-[ Original ]
+Series: Prison Break (Season 1)
+Lead DJ: DJ Afro Amigo
 ```
 
-The selected version controls the applicable media/access information.
+If multiple DJ versions of an episode or series exist, the UI allows selecting the specific edition before playback or purchase.
 
 ---
 

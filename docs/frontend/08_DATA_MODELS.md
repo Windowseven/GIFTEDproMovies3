@@ -248,105 +248,117 @@ The distinction is important because a series is not a movie and an episode is n
 
 # 9. Content Publication Status
 
-Content can have a lifecycle state:
+Content has a lifecycle state representing its readiness and governance approval:
 
 ```ts
-type ContentStatus =
-  | "DRAFT"
-  | "PUBLISHED"
-  | "ARCHIVED";
+// Media Studio status:
+export type MediaContentStatus =
+  | 'DRAFT'
+  | 'READY_FOR_REVIEW'
+  | 'PUBLISHED'
+  | 'ARCHIVED';
+
+// Admin & Catalog status (canonical):
+export type ContentPublishStatus =
+  | 'draft'
+  | 'pending_review'
+  | 'published'
+  | 'archived';
 ```
 
 Meaning:
 
-### DRAFT
+### DRAFT (`draft`)
 
-Content exists but is not publicly available.
+Content metadata and media are being prepared in the Catalog Intake Wizard or Edit Studio. It is not publicly discoverable and not yet submitted for review.
 
-### PUBLISHED
+### READY_FOR_REVIEW (`pending_review`)
 
-Content is available according to its access rules.
+Content intake or revision is complete (completeness >= 80% with required media passes). It has been submitted to the Admin Review Queue and is awaiting administrator approval before going live (when `publishingRequiresApproval` is active).
 
-### ARCHIVED
+### PUBLISHED (`published`)
 
-Content is no longer actively promoted or publicly discoverable.
+Content has passed quality control and approval. It is live and accessible on the storefront and streaming player according to its access and pricing rules.
 
-The frontend must not automatically interpret `DRAFT` as publicly visible.
+### ARCHIVED (`archived`)
+
+Content is unlisted or deactivated from the catalog. It is no longer publicly discoverable.
+
+The frontend must not interpret `DRAFT` or `READY_FOR_REVIEW` (`pending_review`) as publicly visible.
 
 ---
 
 # 10. Category Model
 
+The canonical category entity is managed by Admin and referenced across the Media Studio and storefront:
+
 ```ts
-interface Category {
-  id: ID;
+export interface AdminCategory {
+  id: string;
   name: string;
   slug: string;
-  description?: string | null;
-  imageUrl?: string | null;
+  description: string;
+  displayOrder: number;
+  contentCount: number;
   isActive: boolean;
 }
 ```
 
 Examples:
+- Action
+- Bongo / Tanzanian
+- Comedy
+- Animation & Kids
+- Drama
+- Horror & Thriller
+- Superhero / Sci-Fi
+- Nigerian / Nollywood
 
-```text
-Cartoon
-Superhero
-Christian
-Horror
-Action
-Drama
-Comedy
-```
-
-The actual category list is controlled by Admin.
-
-The frontend must not hard-code the final business category list.
+The active category list is governed centrally by Admin (`/admin/categories`). The frontend dynamically fetches categories from `adminRepository` / `mediaTeamRepository`.
 
 ---
 
 # 11. Country Model
 
+The canonical country entity allows media titles to specify one or multiple production origins:
+
 ```ts
-interface Country {
-  id: ID;
-  name: string;
-  code?: string | null;
-  slug: string;
-  flagUrl?: string | null;
+export interface AdminCountry {
+  id: string;
+  code: string;       // e.g. "TZ", "US", "NG", "KR", "IN"
+  name: string;       // e.g. "Tanzania", "United States", "Nigeria"
+  flagEmoji: string;  // e.g. "🇹🇿", "🇺🇸", "🇳🇬"
+  contentCount: number;
   isActive: boolean;
 }
 ```
 
-A movie may belong to one or multiple countries.
-
-Therefore:
-
-```ts
-countryIds: ID[];
-```
-
-must be supported.
+A movie or series may belong to one or multiple countries (e.g. `countries: string[]`).
 
 ---
 
-# 12. DJ / Translator Model
+# 12. DJ / Translating Voice Artist Model
 
-A DJ/Translator is a content identity associated with a specific version of media.
+A translating DJ/Voice Artist is an essential first-class creator identity on GIFTEDproMovies:
 
 ```ts
-interface DJTranslator {
-  id: ID;
+export interface AdminDJ {
+  id: string;
   name: string;
+  stageName: string;
   slug: string;
-  avatarUrl?: string | null;
-  bio?: string | null;
-  isActive: boolean;
+  avatarUrl: string;
+  bio: string;
+  tier: string;             // e.g. "Resident Master", "Featured Guest", "Senior Artist"
+  contractType: string;     // e.g. "Exclusive Royalty", "Standard"
+  activeTitlesCount: number;
+  totalStreams: number;
+  status: 'active' | 'inactive';
+  colorHex: string;         // Dedicated brand accent color
 }
 ```
 
-The platform must treat DJs/Translators as searchable and filterable entities.
+DJs are selectable in the customer storefront, featured in DJ spotlight rails, and linked to specific video editions (`MovieVersion`).
 
 ---
 
@@ -384,229 +396,222 @@ The frontend should not assume that one URL represents every possible media repr
 
 # 14. Pricing Model
 
-Streaming and downloading are separate commercial actions.
+Streaming and downloading are distinct commercial actions with independent pricing in Tanzanian Shillings (TSh / TZS):
 
 ```ts
-interface Price {
-  amount: number;
-  currency: "TZS";
-}
+// Flat TSh pricing fields on MovieVersion, Episode, and Platform Settings:
+streamingPriceTsh: number;  // e.g. 1000
+downloadPriceTsh: number;   // e.g. 2000
 ```
 
-Example:
+Platform defaults are governed in `AdminPlatformSettings`:
+- `defaultStreamingPriceTsh`: 1,000 TSh
+- `defaultDownloadPriceTsh`: 2,000 TSh
+- `defaultCurrency`: 'TZS'
 
-```ts
-{
-  amount: 3000,
-  currency: "TZS"
-}
-```
-
-The UI must format prices for Tanzanian users.
-
-Example presentation:
-
-```text
-TSh 3,000
-```
-
-The frontend must not assume that streaming and downloading have the same price.
+Presentation:
+- Formatted as `TSh 1,000` / `TSh 2,000` in the storefront and checkout modals.
+- Streaming and downloading retain separate pricing across all movie versions and series episodes.
 
 ---
 
 # 15. Access Duration
 
-Access duration is configurable by Admin.
-
-It must never be hard-coded as a permanent business rule.
+Access duration is configurable by Admin and stored as flat hours:
 
 ```ts
-interface AccessDuration {
-  value: number;
-  unit: "HOURS" | "DAYS";
-}
+accessDurationHours: number; // default: 48 hours
 ```
 
-Examples:
-
-```ts
-{
-  value: 3,
-  unit: "DAYS"
-}
-```
-
-or:
-
-```ts
-{
-  value: 30,
-  unit: "DAYS"
-}
-```
-
-The frontend must display the configured duration.
-
-It must not assume:
-
-```text
-7 days
-```
-
-or:
-
-```text
-30 days
-```
-
-unless that value is actually provided by the data.
+Platform default:
+- `defaultAccessDurationHours`: 48 hours (in `AdminPlatformSettings`).
+- Displayed in the storefront as `"48 Hours Access"`.
+- When an order completes, the customer's entitlement records `accessExpiresAt = new Date(Date.now() + accessDurationHours * 3600 * 1000).toISOString()`.
 
 ---
 
 # 16. Movie Version Model
 
-A movie can have multiple DJ/Translator versions.
-
-This is one of the most important domain concepts.
+A movie can have multiple hard-muxed DJ video editions (e.g. DJ Afro, DJ Murphy, DJ Black). This is one of the foundational domain concepts of GIFTEDproMovies:
 
 ```ts
-interface MovieVersion {
-  id: ID;
-  movieId: ID;
-  djTranslatorId: ID;
-  versionName?: string | null;
-
-  streamPrice: Price;
-  downloadPrice: Price;
-
-  accessDuration: AccessDuration;
-
-  streamAsset?: MediaAsset | null;
-  downloadAsset?: MediaAsset | null;
-
-  status: ContentStatus;
-
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
+export interface MovieVersion {
+  id: string;
+  djId: string;
+  djName: string;
+  streamingPriceTsh: number;
+  downloadPriceTsh: number;
+  accessDurationHours: number;
+  streamingStatus: MediaReadyStatus;
+  downloadStatus: MediaReadyStatus;
+  streamingFileName?: string;
+  downloadFileName?: string;
+  isDefault: boolean;
 }
 ```
 
-Example conceptual relationship:
-
-```text
-Movie
- ├── DJ Mack Version
- │      ├── Stream Price
- │      ├── Download Price
- │      └── Access Duration
- │
- └── DJ John Version
-        ├── Stream Price
-        ├── Download Price
-        └── Access Duration
+In the Media Studio intake and review workflows:
+```ts
+export interface MovieVersionItem {
+  id: string;
+  djId: string;
+  djName: string;
+  versionLabel?: string;
+  streamingFileName?: string;
+  streamingStatus: MediaReadinessStatus;
+  downloadFileName?: string;
+  downloadStatus: MediaReadinessStatus;
+  readinessStatus: 'ready' | 'draft' | 'needs_attention';
+  streamingPriceTsh?: number;
+  downloadPriceTsh?: number;
+}
 ```
 
-A customer purchasing one version must not automatically receive another version.
+Key principles:
+1. Each DJ version links to its own streaming video file and download package.
+2. A customer purchasing one DJ edition receives access to that specific hard-muxed video release.
+3. The player switches editions dynamically via query param `?dj=[DJ_NAME]`.
 
 ---
 
 # 17. Movie Model
 
+The canonical movie entity across the catalog, Admin, and customer experience:
+
 ```ts
-interface Movie {
-  id: ID;
-  slug: string;
-
+export interface AdminMovie {
+  id: string;
   title: string;
+  originalTitle: string;
+  slug: string;
+  releaseYear: number;
+  durationMinutes: number;
+  posterUrl: string;
+  backdropUrl: string;
+  trailerUrl?: string;
   description: string;
-
-  contentType: "MOVIE";
-
-  poster: MediaAsset;
-  backdrop?: MediaAsset | null;
-  trailer?: MediaAsset | null;
-
-  releaseYear?: number | null;
-  durationMinutes?: number | null;
-
-  categoryIds: ID[];
-  countryIds: ID[];
-
-  versionIds: ID[];
-
-  status: ContentStatus;
-
+  genres: string[];
+  countries: string[];
+  ageRating: string;
+  rating: number;
+  streamingStatus: MediaReadyStatus;
+  downloadStatus: MediaReadyStatus;
+  status: ContentPublishStatus;
   isFeatured: boolean;
   isTrending: boolean;
+  versions: MovieVersion[];
+  viewsCount: number;
+  purchasesCount: number;
+  downloadsCount: number;
+  publishedAt: string;
+}
 
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
+// Customer alias:
+export type MovieItem = AdminMovie;
+```
+
+In the Media Studio (`MediaContentItem`):
+```ts
+export interface MediaContentItem {
+  id: string;
+  slug: string;
+  codeId: string; // e.g. #GF-9042
+  title: string;
+  originalTitle: string;
+  contentType: 'MOVIE';
+  releaseYear: number;
+  durationMinutes: number;
+  description: string;
+  posterUrl: string;
+  backdropUrl?: string;
+  trailerUrl?: string;
+  categoryNames: string[];
+  countryNames: string[];
+  versions: MovieVersionItem[];
+  streamingStatus: MediaReadinessStatus;
+  downloadStatus: MediaReadinessStatus;
+  completenessPercent: number;
+  checklist: ContentReadinessChecklist;
+  status: MediaContentStatus;
+  updatedAt: string;
+  lastEditedBy?: string;
 }
 ```
 
-Important:
-
-Movie-level metadata and version-level commercial data are separate.
-
-For example:
-
-```text
-Movie
-  title
-  description
-  country
-  category
-  poster
-
-MovieVersion
-  DJ
-  streaming price
-  download price
-  access duration
-  media file
+The 9-point content readiness checklist enforced in intake:
+```ts
+export interface ContentReadinessChecklist {
+  basicInfo: boolean;       // title, description, release year, duration
+  poster: boolean;          // vertical 2:3 artwork
+  backdrop: boolean;        // horizontal 16:9 artwork
+  trailer: boolean;         // trailer media URL or video
+  categories: boolean;      // >= 1 category assigned
+  countries: boolean;       // >= 1 country origin assigned
+  djAssigned: boolean;      // translating DJ voice artist assigned
+  streamingMedia: boolean;  // streamingStatus === 'ready'
+  downloadMedia: boolean;   // downloadStatus === 'ready'
+}
 ```
-
-This separation is mandatory.
 
 ---
 
 # 18. Series Model
 
+The canonical episodic series entity:
+
 ```ts
-interface Series {
-  id: ID;
-  slug: string;
-
+export interface AdminSeries {
+  id: string;
   title: string;
-  description: string;
-
-  contentType: "SERIES";
-
-  poster: MediaAsset;
-  backdrop?: MediaAsset | null;
-  trailer?: MediaAsset | null;
-
-  releaseYear?: number | null;
-
-  categoryIds: ID[];
-  countryIds: ID[];
-
-  seasonIds: ID[];
-
-  status: ContentStatus;
-
+  slug: string;
+  releaseYear: number;
+  seasonsCount: number;
+  episodesCount: number;
+  posterUrl: string;
+  backdropUrl: string;
+  genres: string[];
+  countries: string[];
+  pricingModel: 'per_episode' | 'per_season' | 'full_series' | 'combination';
+  status: ContentPublishStatus;
   isFeatured: boolean;
   isTrending: boolean;
+  totalStreams: number;
+  publishedAt: string;
+  leadDjName?: string;                      // Dedicated voice artist continuity across seasons
+  defaultEpisodeStreamPriceTsh?: number;    // e.g. 500 TSh
+  defaultEpisodeDownloadPriceTsh?: number;  // e.g. 1000 TSh
+  seasons?: AdminSeason[];
+}
 
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
+// Customer alias:
+export type SeriesItem = AdminSeries;
+```
+
+In the Media Studio (`SeriesContentItem`):
+```ts
+export interface SeriesContentItem {
+  id: string;
+  slug: string;
+  codeId: string;
+  title: string;
+  originalTitle: string;
+  contentType: 'SERIES';
+  releaseYear: number;
+  posterUrl: string;
+  backdropUrl?: string;
+  trailerUrl?: string;
+  categoryNames: string[];
+  countryNames: string[];
+  description: string;
+  seasons: SeasonItem[];
+  totalEpisodes: number;
+  completenessPercent: number;
+  status: MediaContentStatus;
+  updatedAt: string;
 }
 ```
 
-A Series does not directly contain every episode in its root model.
-
 The relationship is:
-
 ```text
 Series
   ↓
@@ -620,21 +625,23 @@ Episode
 # 19. Season Model
 
 ```ts
-interface Season {
-  id: ID;
-  seriesId: ID;
-
+export interface AdminSeason {
+  id: string;
   seasonNumber: number;
-  title?: string | null;
+  title: string;
+  seasonPassPriceTsh: number;  // e.g. 3,500 TSh for full season access
+  episodes: AdminEpisode[];
+}
+```
 
-  poster?: MediaAsset | null;
-
-  episodeIds: ID[];
-
-  status: ContentStatus;
-
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
+In the Media Studio:
+```ts
+export interface SeasonItem {
+  id: string;
+  seasonNumber: number;
+  title: string;
+  episodes: EpisodeItem[];
+  status: MediaContentStatus;
 }
 ```
 
@@ -643,63 +650,75 @@ interface Season {
 # 20. Episode Model
 
 ```ts
-interface Episode {
-  id: ID;
-  seriesId: ID;
-  seasonId: ID;
-
+export interface AdminEpisode {
+  id: string;
   episodeNumber: number;
   title: string;
+  durationMinutes: number;
   description: string;
-
-  thumbnail?: MediaAsset | null;
-
-  durationMinutes?: number | null;
-
-  status: ContentStatus;
-
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
+  thumbnailUrl?: string;
+  streamingStatus: MediaReadyStatus;
+  downloadStatus: MediaReadyStatus;
+  streamPriceTsh: number;      // e.g. 500 TSh
+  downloadPriceTsh: number;    // e.g. 1000 TSh
+  status: ContentPublishStatus;
+  viewsCount?: number;
 }
 ```
 
-Episode-level pricing is intentionally not permanently defined here.
+In the Media Studio:
+```ts
+export interface EpisodeItem {
+  id: string;
+  episodeNumber: number;
+  title: string;
+  durationMinutes: number;
+  description: string;
+  thumbnailUrl?: string;
+  djName?: string;
+  streamingStatus: MediaReadinessStatus;
+  downloadStatus: MediaReadinessStatus;
+  status: MediaContentStatus;
+}
+```
 
 ---
 
 # 21. Series Pricing Model
 
-The business requirement states that Admin controls series pricing.
-
-Possible models may include:
+The series pricing model is fully implemented and configurable:
 
 ```ts
-type SeriesPricingModel =
-  | "PER_EPISODE"
-  | "PER_SEASON"
-  | "FULL_SERIES"
-  | "COMBINATION";
+export type SeriesPricingModel =
+  | 'per_episode'
+  | 'per_season'
+  | 'full_series'
+  | 'combination';
 ```
 
-However, this is currently a **pending business decision**.
-
-Therefore the frontend must not assume which model is active.
-
-Until the owner confirms the final rule, this type should be treated as provisional.
+Supported commercial flows:
+- **Per Episode**: Individual episodes purchased at `streamPriceTsh` or `downloadPriceTsh`.
+- **Per Season**: Season Pass purchased at `seasonPassPriceTsh` (unlocks all episodes in that season).
+- **Full Series / Combination**: Allows both individual episode purchases and season/series passes.
 
 ---
 
 # 22. Purchase Type
 
+The platform defines distinct purchase types across single items, episodic content, and passes:
+
 ```ts
-type PurchaseType =
-  | "STREAM"
-  | "DOWNLOAD";
+export type PurchaseType =
+  | 'subscription'
+  | 'vip_pass'
+  | 'ppv_stream'
+  | 'ppv_download'
+  | 'series_episode'
+  | 'series_season'
+  | 'series_bundle';
 ```
 
-This distinction is mandatory.
-
-A customer can purchase streaming access without purchasing download access.
+This distinction allows precise entitlement calculation, accounting, and download authorization.
 
 ---
 
@@ -1770,60 +1789,50 @@ Backend checks will be authoritative.
 
 ---
 
-# 57. Pending Business Decisions
+# 57. Resolved Operational & Business Decisions
 
-The following remain intentionally unresolved:
+The key operational decisions have been resolved and implemented in the frontend architecture:
 
-### 57.1 Media Team publishing approval
+### 57.1 Media Team publishing approval (RESOLVED & IMPLEMENTED)
 
-Still to confirm:
-
-```text
-Media Team uploads
-        ↓
-Direct publish
-```
-
-or:
+Implemented as a dynamic governance gate controlled by `AdminPlatformSettings.publishingRequiresApproval` (toggleable in `/admin/settings` and queried by `adminRepository.isPublishingApprovalRequired()`):
 
 ```text
-Media Team uploads
+When publishingRequiresApproval === true:
+Media Team Intake / Edit
         ↓
-Admin review
+Submit for Review (status = 'READY_FOR_REVIEW' / 'pending_review')
         ↓
-Publish
+Admin Review Queue (/admin/movies or /admin/series)
+        ↓
+Approve & Publish (status = 'PUBLISHED' / 'published')
+
+When publishingRequiresApproval === false:
+Media Team Intake / Edit
+        ↓
+Direct Publish (status = 'PUBLISHED' / 'published')
 ```
 
-The frontend must not permanently assume either workflow until confirmed.
+### 57.2 Series pricing (RESOLVED & IMPLEMENTED)
 
----
+Implemented with multiple configurable commercial strategies:
+- `pricingModel: 'per_episode' | 'per_season' | 'full_series' | 'combination'`
+- Per-episode pricing: `streamPriceTsh` and `downloadPriceTsh` on `AdminEpisode`.
+- Season Pass pricing: `seasonPassPriceTsh` (e.g. 3,500 TSh) on `AdminSeason`.
+- Series-level defaults: `defaultEpisodeStreamPriceTsh` and `defaultEpisodeDownloadPriceTsh` on `AdminSeries`.
 
-### 57.2 Series pricing
+### 57.3 Payment providers (RESOLVED & IMPLEMENTED)
 
-Still to confirm:
+Implemented via `PaymentMethod = 'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'card'`:
+- **M-Pesa** (Vodacom Tanzania)
+- **Tigo Pesa** (Yas / Tigo Tanzania)
+- **Airtel Money** (Airtel Tanzania)
+- **HaloPesa** (Halotel Tanzania)
+- **Card** (Visa / MasterCard)
 
-```text
-Per Episode
-Per Season
-Full Series
-Combination
-```
+### 57.4 Maximum active devices (RESOLVED & IMPLEMENTED)
 
----
-
-### 57.3 Payment providers
-
-Tanzania Mobile Money is required.
-
-Exact providers remain to be confirmed.
-
----
-
-### 57.4 Maximum active devices
-
-Controlled device access is recommended.
-
-The actual maximum number of devices remains to be confirmed.
+Implemented via `AdminPlatformSettings.maxActiveDevicesPerUser` (default: 3 concurrent devices) and tracked per user in `CustomerDevice` (`id`, `deviceName`, `deviceType`, `lastActive`, `isCurrent`).
 
 ---
 
@@ -1853,32 +1862,26 @@ OpenCode must NOT:
 
 ---
 
-# 59. Recommended Type Organization
+# 59. Implemented Type Organization
 
-Types should be grouped by domain.
-
-Recommended structure:
+The codebase organizes domain types into 3 clean, domain-aligned files in `src/types/`:
 
 ```text
 src/
 └── types/
-    ├── common.ts
-    ├── user.ts
-    ├── movie.ts
-    ├── series.ts
-    ├── category.ts
-    ├── country.ts
-    ├── dj-translator.ts
-    ├── commerce.ts
-    ├── payment.ts
-    ├── subscription.ts
-    ├── entitlement.ts
-    ├── download.ts
-    ├── discovery.ts
-    └── index.ts
+    ├── admin.ts        # Admin entities, commercial rates, KPIs, platform settings, canonical models
+    ├── mediaTeam.ts    # Media Studio intake models, readiness checklist (9-point), review contracts
+    └── customer.ts     # Customer storefront views, entitlements, continue-watching, search results
 ```
 
-Feature-specific view models may live inside their feature when they are not reusable domain entities.
+1. **`src/types/admin.ts`**:
+   Authoritative platform models: `AdminMovie`, `MovieVersion`, `AdminSeries`, `AdminSeason`, `AdminEpisode`, `AdminDJ`, `AdminCategory`, `AdminCountry`, `AdminOrder`, `AdminPaymentRecord`, `AdminCustomer`, `AdminPlatformSettings`, `PPVRateTier`, `SubscriptionPlanConfig`, `CustomerDevice`, `MediaReadyStatus`, `ContentPublishStatus`.
+
+2. **`src/types/mediaTeam.ts`**:
+   Media operations and intake models: `MediaContentItem`, `MovieVersionItem`, `ContentReadinessChecklist`, `MediaContentStatus`, `SeriesContentItem`, `SeasonItem`, `EpisodeItem`, `AttentionItem`, `MediaAssetItem`, `UploadSession`.
+
+3. **`src/types/customer.ts`**:
+   Customer consumption views: `MovieItem = AdminMovie`, `SeriesItem = AdminSeries`, `DjItem = AdminDJ`, `CategoryItem = AdminCategory`, `CountryItem = AdminCountry`, `SubscriptionPlan`, `ContinueWatchingItem`, `CustomerEntitlement`, `CustomerProfile`, `SearchResultGroup`.
 
 ---
 

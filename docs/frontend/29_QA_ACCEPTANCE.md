@@ -1717,10 +1717,10 @@ The following must never be accidentally changed during frontend implementation:
 * Admin controls financial information.
 * Media Team does not access financial information.
 * Customer does not access Admin features.
-* Trending may be algorithmically determined and manually promoted.
-* Series pricing remains configurable.
-* Device access policy remains configurable/pending final business decision.
-* Media Team publishing approval remains pending business decision.
+* Trending is algorithmically ranked with manual promotion support.
+* Series pricing is configurable via `pricingModel` (`per_episode`, `per_season`, `full_series`, `combination`).
+* Device access policy is governed dynamically via `adminPlatformSettings.maxActiveDevicesPerUser` (default: 3 devices).
+* Media Team publishing approval is governed dynamically via `adminPlatformSettings.publishingRequiresApproval` (direct publish vs. Admin review queue).
 
 ---
 

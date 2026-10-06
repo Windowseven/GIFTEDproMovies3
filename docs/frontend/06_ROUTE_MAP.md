@@ -1835,18 +1835,24 @@ ADMIN
 
 MEDIA TEAM
 │
-├── /media-team
-├── /media-team/movies
-├── /media-team/series
-├── /media-team/review
-├── /media-team/qc
-├── /media-team/metadata
-├── /media-team/assets
-├── /media-team/transcoding
-├── /media-team/stems
-├── /media-team/djs
-├── /media-team/categories
-└── /media-team/countries
+├── /media-team                     (Content Operations Overview & KPIs)
+├── /media-team/movies              (Movie Catalog Library)
+│     ├── /media-team/movies/new    (Catalog Intake Wizard — 6 Steps)
+│     └── /media-team/movies/[id]/edit (Movie Edit Studio)
+├── /media-team/series              (Series & Episodic Studio)
+│     ├── /media-team/series/new    (Series Intake Wizard)
+│     └── /media-team/series/[id]/edit (Series Edit Studio)
+├── /media-team/review              (Review Queue & Readiness Gate)
+├── /media-team/assets              (Media Asset Library & File Storage)
+├── /media-team/categories          (Category Taxonomy Reference)
+├── /media-team/countries           (Country Taxonomy Reference)
+├── /media-team/djs                 (Translating DJs Reference)
+│
+└── Automated Redirect Aliases:
+      ├── /media-team/qc          → /media-team/review
+      ├── /media-team/transcoding → /media-team/assets
+      ├── /media-team/stems       → /media-team/djs
+      └── /media-team/metadata    → /media-team/categories
 
 
 SYSTEM
@@ -1940,36 +1946,30 @@ Each route must have a distinct purpose.
 
 ---
 
-# 62. Pending Business Decisions
+# 62. Resolved Operational Decisions
 
-The following are intentionally NOT finalized by this document:
+The core platform operational rules have been finalized and implemented in the frontend architecture:
 
-### 1. Media Team approval
+### 1. Media Team approval (RESOLVED & IMPLEMENTED)
 
-Whether uploaded content requires Admin approval before publication.
+Governed dynamically via `adminPlatformSettings.publishingRequiresApproval` (queried by `adminRepository.isPublishingApprovalRequired()`):
+- When enabled (`true`): Media Team intake creates `'READY_FOR_REVIEW'` records requiring Admin review at `/admin/movies` or `/admin/series` before live publication.
+- When disabled (`false`): Media Team can publish directly to the live catalog.
 
-### 2. Series pricing
+### 2. Series pricing (RESOLVED & IMPLEMENTED)
 
-Whether users can purchase:
+Configured via `pricingModel` (`'per_episode' | 'per_season' | 'full_series' | 'combination'`):
+- Episode pricing: `streamPriceTsh` and `downloadPriceTsh` per episode.
+- Season Pass pricing: `seasonPassPriceTsh` on each season.
+- Series default fallbacks on `AdminSeries`.
 
-```text
-Episode
-Season
-Full Series
-Combination
-```
+### 3. Maximum active devices (RESOLVED & IMPLEMENTED)
 
-### 3. Maximum active devices
+Governed via `adminPlatformSettings.maxActiveDevicesPerUser` (default: 3 devices per customer account) and tracked in `CustomerDevice`.
 
-The exact number of permitted active devices.
+### 4. Payment providers (RESOLVED & IMPLEMENTED)
 
-### 4. Payment providers
-
-The exact Tanzania Mobile Money providers.
-
-These decisions must be resolved before implementing dependent business logic.
-
-The frontend may represent these as configurable concepts but MUST NOT invent final business rules.
+Implemented for Tanzania Mobile Money and Cards via `PaymentMethod = 'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'card'` (M-Pesa, Tigo Pesa, Airtel Money, HaloPesa, Visa/MasterCard).
 
 ---
 

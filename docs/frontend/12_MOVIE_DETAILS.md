@@ -430,27 +430,29 @@ Pricing belongs to the selected version.
 Example:
 
 ```text
-DJ Mack
+DJ Afro Amigo
 
 Watch
-TZS 2,000
-Access: 7 days
+TSh 1,000
+Access: 48 Hours
 
 Download
-TZS 3,500
-Access: 7 days
+TSh 2,000
+Access: 48 Hours
 ```
 
 Another version may legitimately have different pricing:
 
 ```text
-DJ John
+DJ Murphy
 
 Watch
-TZS 2,500
+TSh 1,500
+Access: 48 Hours
 
 Download
-TZS 4,000
+TSh 2,500
+Access: 48 Hours
 ```
 
 The frontend must therefore never assume that all versions share the same price.

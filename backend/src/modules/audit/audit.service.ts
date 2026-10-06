@@ -1,6 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DRIZZLE_DATABASE } from "../../infrastructure/database/database.tokens.js";
-import type { ApplicationDatabase } from "../../infrastructure/database/database.module.js";
+import type {
+  ApplicationDatabase,
+  DatabaseClient,
+} from "../../infrastructure/database/database.module.js";
 import { auditEventsTable } from "../../infrastructure/database/schemas/audit-events.schema.js";
 import { sanitizeMetadata } from "../../infrastructure/logging/redaction.js";
 
@@ -13,6 +16,7 @@ export interface RecordAuditEventInput {
   ipAddress?: string | null;
   userAgent?: string | null;
   failClosed?: boolean;
+  tx?: DatabaseClient;
 }
 
 @Injectable()
@@ -32,8 +36,10 @@ export class AuditService {
       ? (sanitizeMetadata(input.metadata) as Record<string, unknown>)
       : null;
 
+    const client = input.tx ?? this.db;
+
     try {
-      await this.db.insert(auditEventsTable).values({
+      await client.insert(auditEventsTable).values({
         actorId: input.actorId ?? null,
         action: input.action,
         resourceType: input.resourceType,

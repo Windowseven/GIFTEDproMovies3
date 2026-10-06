@@ -22,6 +22,20 @@
       "when": 1791100000000,
       "tag": "0002_quiet_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791148719900,
+      "tag": "0003_spotty_absorbing_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791152319569,
+      "tag": "0004_chunky_clint_barton",
+      "breakpoints": true
     }
   ]
 }

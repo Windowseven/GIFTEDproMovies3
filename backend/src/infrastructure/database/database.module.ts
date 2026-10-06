@@ -8,6 +8,10 @@ import { DatabaseService } from "./database.service.js";
 import * as schema from "./schemas/index.js";
 
 export type ApplicationDatabase = NodePgDatabase<typeof schema>;
+export type ApplicationTransactionClient = Parameters<
+  Parameters<ApplicationDatabase["transaction"]>[0]
+>[0];
+export type DatabaseClient = ApplicationDatabase | ApplicationTransactionClient;
 
 @Global()
 @Module({

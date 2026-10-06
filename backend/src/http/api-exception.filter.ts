@@ -64,11 +64,29 @@ export class ApiExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    const rawResponse = exception instanceof HttpException ? exception.getResponse() : null;
+    const isCustomObject =
+      typeof rawResponse === "object" && rawResponse !== null && !Array.isArray(rawResponse);
+    const customResponse = isCustomObject
+      ? (rawResponse as Record<string, unknown>)
+      : null;
+
     const statusDetails = STATUS_DETAILS[statusCode];
-    const code = statusDetails?.code ??
-      (statusCode >= 500 ? "INTERNAL_ERROR" : "REQUEST_REJECTED");
-    const message = statusDetails?.message ??
-      (statusCode >= 500 ? "An unexpected error occurred." : "The request was rejected.");
+
+    const code =
+      statusCode >= 500
+        ? "INTERNAL_ERROR"
+        : typeof customResponse?.code === "string" && customResponse.code.length > 0
+          ? customResponse.code
+          : statusDetails?.code ?? "REQUEST_REJECTED";
+
+    const message =
+      statusCode >= 500
+        ? "An unexpected error occurred."
+        : typeof customResponse?.message === "string" && customResponse.message.length > 0
+          ? customResponse.message
+          : statusDetails?.message ?? "The request was rejected.";
 
     if (statusCode >= 500) {
       this.logger.error(
@@ -82,10 +100,20 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     const validationErrors = getValidationErrors(exception);
+    const customDetails =
+      Array.isArray(customResponse?.details) ? (customResponse!.details as unknown[]) : null;
+
+    const details =
+      validationErrors.length > 0
+        ? validationErrors
+        : customDetails !== null
+          ? customDetails
+          : undefined;
+
     const error = {
       code,
       message,
-      ...(validationErrors.length > 0 ? { details: validationErrors } : {}),
+      ...(details !== undefined ? { details } : {}),
       timestamp: new Date().toISOString(),
       requestId: request.id,
     };

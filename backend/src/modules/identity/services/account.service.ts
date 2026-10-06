@@ -22,6 +22,7 @@ export const VALID_CAPABILITIES = [
   "CONTENT_UNPUBLISH",
   "CONTENT_ARCHIVE",
   "CONTENT_DELETE",
+  "TAXONOMY_MANAGE",
 ] as const;
 
 export type StaffCapability = (typeof VALID_CAPABILITIES)[number];

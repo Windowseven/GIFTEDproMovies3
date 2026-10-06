@@ -115,62 +115,68 @@ The Media Team must never inherit Admin functionality simply because both roles 
 
 ---
 
-# 5. Media Team Route
+# 5. Media Team Routes
 
-Primary route:
+Primary entry point:
 
-```text id="z5o6v1"
+```text
 /media-team
 ```
 
-Implemented content operations routes:
+Canonical content operations routes:
 
-```text id="q8m3sd"
+```text
 /media-team                  → Content Dashboard & KPIs
-/media-team/movies           → Movies Library & Ingestion Studio
+/media-team/movies           → Movies Library (Search, filters, status, edit links)
+/media-team/movies/new       → Add New Movie (6-Step Catalog Intake Wizard)
+/media-team/movies/[id]/edit → Movie Edit Studio (Metadata, artwork, DJ editions, media files)
 /media-team/series           → Series & Episodic Studio
-/media-team/review           → Review Queue (Pending Admin Approval)
-/media-team/qc               → Quality Control & 9-Point Readiness Checklist
-/media-team/metadata         → Metadata & Synopsis Management
-/media-team/assets           → Artwork (Posters, Backdrops, Trailers)
-/media-team/transcoding      → Transcoding Pipeline Monitor
-/media-team/stems            → DJ Audio Stems & Version Linking
-/media-team/djs              → DJ / Voice Artist Catalog
-/media-team/categories       → Taxonomy Categories
-/media-team/countries        → Taxonomy Countries
+/media-team/series/new       → Add New Series (Series Intake Wizard)
+/media-team/series/[id]/edit → Series Edit Studio (Seasons, episodes, pricing model)
+/media-team/review           → Review Queue (9-point readiness verification & publishing gate)
+/media-team/assets           → Media Asset Library (Streaming masters, downloads, artwork)
+/media-team/categories       → Taxonomy Reference (Admin-governed categories)
+/media-team/countries        → Taxonomy Reference (Country origins)
+/media-team/djs              → Translating DJs & Voice Artists Reference
+```
+
+Consolidated redirect aliases (automated client redirects):
+
+```text
+/media-team/qc          → Redirects to /media-team/review (Centralized 9-point checklist & review)
+/media-team/transcoding → Redirects to /media-team/assets (Centralized media assets & file processing)
+/media-team/stems       → Redirects to /media-team/djs (Audio voiceovers & DJ profiles)
+/media-team/metadata    → Redirects to /media-team/categories (Taxonomy categories & origins)
 ```
 
 ---
 
 # 6. Media Team Navigation & Workflow
 
-Implemented sidebar navigation:
+Implemented Studio sidebar (`MediaTeamSidebar.tsx`):
 
-```text id="3m1q7w"
-MEDIA TEAM STUDIO
+```text
+GIFTEDproMovies STUDIO OPS
 
-Overview
-  └── Dashboard (/media-team)
+Quick Direct Intake:
+  [+ New Movie]  (/media-team/movies/new)
+  [+ New Series] (/media-team/series/new)
 
-Content Operations
-  ├── Movies & DJ Editions (/media-team/movies)
-  ├── Series Studio (/media-team/series)
-  └── Review Queue (/media-team/review)
+Operations
+  └── Overview Dashboard (/media-team)
 
-Quality & Assets
-  ├── Quality Control & Audits (/media-team/qc)
-  ├── Metadata Editor (/media-team/metadata)
-  ├── Media Assets (/media-team/assets)
-  ├── Transcoding Monitor (/media-team/transcoding)
-  └── Audio Stems (/media-team/stems)
+Media Library
+  ├── Movie Library       (/media-team/movies)  [Badge: total count]
+  └── Series & TV Shows   (/media-team/series)  [Badge: total count]
 
-Taxonomies
-  ├── DJs / Translators (/media-team/djs)
-  ├── Categories (/media-team/categories)
-  └── Countries (/media-team/countries)
+Publishing & Quality
+  └── Review Queue        (/media-team/review)  [Badge: 'Ready for Live']
+
+Footer:
+  Staff Account Profile + Logout Action
 ```
 
-Do not display Admin-only navigation items.
+Taxonomy and asset references are accessed contextually from content studios and review workflows. Admin-only sections (Finance, Orders, Customer Management, Platform Settings) are strictly hidden from Media Team members.
 
 ---
 
@@ -348,13 +354,14 @@ unless a future requirement explicitly authorizes non-sensitive performance metr
 
 # 15. Movie Search
 
-Media Team should be able to search movies by:
+Media Team can search the movie catalog by:
 
-* title
-* slug
-* DJ/Translator
+* Title (Swahili / release title)
+* Original / Hollywood title
+* Catalog Code ID (e.g. `#GF-9042`)
+* Translating DJ / Voice Artist name
 
-Search should be fast and contextual.
+Search is instant and contextual.
 
 ---
 
@@ -362,208 +369,136 @@ Search should be fast and contextual.
 
 Useful filters:
 
-* status
-* category
-* country
-* DJ/Translator
-
-Possible status values:
-
-```text id="j2p5w0"
-DRAFT
-PUBLISHED
-ARCHIVED
-```
-
-If a future approval state is adopted, additional states can be introduced without redesigning the entire page.
+* status (`all`, `DRAFT`, `READY_FOR_REVIEW`, `PUBLISHED`, `ARCHIVED`)
+* category (dynamic from available taxonomy)
+* DJ / Voice Artist (dynamic from active roster)
 
 ---
 
-# 17. Create Movie
+# 17. Catalog Intake Wizard (Add New Movie)
 
 Route:
 
-```text id="4c1m8r"
+```text
 /media-team/movies/new
 ```
 
-The creation workflow should be structured rather than presenting one massive form.
+The intake experience uses a 6-step structured wizard (`STEPS`) paired with real-time completeness tracking:
 
-Recommended sections:
-
-```text id="0j7x9q"
-1. Basic Information
-2. Visual Assets
-3. Classification
-4. DJ / Translator
-5. Versions
-6. Media
-7. Publishing
+```text
+Step 1: Title & Info      → Title, optional original title, release year, duration, description
+Step 2: Visual Artwork    → Vertical poster (2:3), horizontal backdrop (16:9), trailer URL
+Step 3: Taxonomies        → Category multi-select, country of origin multi-select
+Step 4: Translating DJ    → Primary voice artist/DJ assignment (single DJ voiceover release)
+Step 5: Media Files       → Streaming video file & status, download package & status
+Step 6: Review & Save     → 9-point readiness verification, draft save, and review submission
 ```
 
 ---
 
-# 18. Basic Movie Information
+# 18. Step 1: Title & Basic Information
 
-Fields:
+Fields displayed in the UI:
+* **Movie Title** (required): Primary localized/Swahili release title.
+* **Original / Hollywood Title** (optional toggle): Foreign theatrical source title (e.g., `"Godzilla x Kong: The New Empire"`), revealed via *"+ Add original / Hollywood title"*.
+* **Release Year**: Numerical year input (defaults to current year).
+* **Duration (Minutes)**: Integer length in minutes (default 120 min).
+* **About the Movie**: Comprehensive synopsis and plot overview.
 
-* Title
-* Description
-* Release year
-* Duration
-* Slug
-
-The UI must provide clear validation.
-
----
-
-# 19. Visual Assets
-
-The Media Team should be able to manage:
-
-* poster
-* backdrop
-* trailer
-
-The interface should provide:
-
-* preview
-* replacement
-* removal
-* upload progress
-* validation feedback
-
-Actual storage implementation belongs to the future backend.
+Validation: Movie Title is required. Technical identifiers (such as URL slugs) do not appear in the wizard UI to keep the intake process intuitive and non-technical; they are generated automatically by the platform behind the scenes.
 
 ---
 
-# 20. Classification
+# 19. Step 2: Visual Artwork
 
-Movie classification should support:
+Artwork assets:
+* **Poster URL** (vertical 2:3 ratio): Displayed in rails, grids, and hero cards.
+* **Backdrop URL** (horizontal 16:9 ratio): Displayed in page headers and detail views.
+* **Trailer URL / Embed**: Promotional teaser preview.
 
-* categories
-* countries
-
-Selections should use reusable searchable controls when the dataset is large.
-
----
-
-# 21. DJ / Translator Assignment
-
-The Media Team should be able to associate the appropriate DJ/Translator with a movie version.
-
-A movie may have multiple versions.
-
-Example:
-
-```text id="j3s7ap"
-Movie
-└── Versions
-    ├── DJ Mack
-    ├── DJ John
-    └── DJ Peter
-```
+UI includes real-time image previews and asset validation status.
 
 ---
 
-# 22. Movie Version Management
+# 20. Step 3: Taxonomies & Origins
 
-Each version should conceptually contain:
-
-* DJ/Translator
-* version name
-* streaming media
-* download media
-* streaming price
-* download price
-* access duration
-* status
-
-The frontend must preserve the relationship between the movie and its versions.
+Classification selections:
+* **Categories / Genres**: Multi-select from `mockAvailableCategories` / `adminRepository.getCategories()` (e.g. Action, Bongo, Comedy, Superhero).
+* **Countries of Origin**: Multi-select from `mockAvailableCountries` / `adminRepository.getCountries()` (e.g. Tanzania, United States, Nigeria).
 
 ---
 
-# 23. Pricing Visibility
+# 21. Step 4: Translating DJ Assignment
 
-The Media Team may need to interact with content forms that contain pricing fields because versions are part of content configuration.
+Each movie release features a primary translating DJ / Voice Artist:
+* Selection from active DJs via `mockAvailableDjs` / `adminRepository.getDjs()` (e.g. DJ Afro Amigo, DJ Murphy, DJ Black).
+* Displays DJ avatar, tier badge, and dedicated branding color.
+* Associates the release with the DJ's profile and catalog rails.
 
-However, pricing authority belongs to the Admin.
+---
 
-Therefore the exact Media Team pricing permission remains a business decision.
+# 22. Step 5: Media Files & Delivery Readiness
 
-Do not automatically assume:
+Delivery asset management:
+* **Streaming Media**: File name identifier and readiness state (`ready` | `processing` | `not_available`).
+* **Download Media Package**: Offline download package identifier and readiness state.
+* Supports setting stream and download readiness independently.
 
-```text id="q2w9eb"
-Media Team can change prices
-```
+---
 
-or:
+# 23. Step 6: Review, Completeness & Pricing
 
-```text id="4m0zqc"
-Media Team cannot see price fields
-```
-
-unless this is explicitly finalized.
-
-If pricing remains Admin-controlled, the frontend should represent those fields as read-only or omit them from Media Team editing.
+At Step 6:
+* Real-time 9-point checklist breakdown displays passed and pending requirements.
+* Completeness percentage badge reflects catalog readiness.
+* Pricing fields are pre-populated from platform defaults (`defaultStreamingPriceTsh`, `defaultDownloadPriceTsh`) or configured per edition.
 
 ---
 
 # 24. Access Duration
 
-Access duration is configurable.
-
-The Media Team must not hard-code a duration.
-
-If access duration is exposed in a Media Team workflow, it must come from the shared typed model and business configuration.
+Configured from platform settings:
+* Flat duration in hours (`accessDurationHours`, default: 48 hours).
+* Displayed clearly in customer storefront checkout modals.
 
 ---
 
-# 25. Publishing Status
+# 25. Publishing Lifecycle Statuses
 
-Media Team content may use:
-
-```text id="1k4s9f"
-DRAFT
-PUBLISHED
-ARCHIVED
+```ts
+export type MediaContentStatus =
+  | 'DRAFT'
+  | 'READY_FOR_REVIEW'
+  | 'PUBLISHED'
+  | 'ARCHIVED';
 ```
 
-However, whether Media Team can directly publish content is currently unresolved.
+- **`DRAFT`**: Work in progress; not visible on storefront.
+- **`READY_FOR_REVIEW`**: Intake complete; queued for Admin review.
+- **`PUBLISHED`**: Approved and live in customer catalog.
+- **`ARCHIVED`**: Deactivated or delisted.
 
 ---
 
-# 26. Publishing Approval — Pending Decision
+# 26. Publishing Approval Policy (RESOLVED & IMPLEMENTED)
 
-The business has not finalized whether Media Team content requires Admin approval.
+The publishing approval gate is fully implemented and governed dynamically via `adminPlatformSettings.publishingRequiresApproval`:
 
-The architecture must therefore support both possibilities.
-
-### Option A — Direct Publishing
-
-```text id="u9p3w2"
-Media Team
-   ↓
-Draft
-   ↓
-Publish
+```ts
+// Evaluated on mount in Media Team intake & edit screens:
+const isRequired = await adminRepository.isPublishingApprovalRequired();
 ```
 
-### Option B — Admin Approval
+### When Approval Gate Is Active (`publishingRequiresApproval === true`)
+1. An informational banner is displayed: *"Approval Gate Active: Content must be submitted to the Admin Review Queue before going live."*
+2. Primary button displays **"Submit for Review"** (sets status to `'READY_FOR_REVIEW'`).
+3. Title enters the Review Queue (`/media-team/review`) and Admin Content Management (`/admin/movies` or `/admin/series`).
+4. An Administrator reviews the 9-point checklist and clicks **"Approve & Publish"** to make the content live (`status = 'published'`).
 
-```text id="b4r7ny"
-Media Team
-   ↓
-Draft
-   ↓
-Submit for Review
-   ↓
-Admin Review
-   ↓
-Publish
-```
+### When Approval Gate Is Inactive (`publishingRequiresApproval === false`)
+1. Media Team operators can publish directly with **"Publish to Live Catalog"** (`status = 'PUBLISHED'`).
 
-Do not permanently implement either business rule until confirmed.
+At all times, operators can select **"Save Draft"** (`status = 'DRAFT'`) to persist partial progress without triggering review gates.
 
 ---
 
@@ -774,26 +709,39 @@ Preview should help the Media Team confirm the correct asset before saving.
 
 ---
 
-# 38. Content Completeness
+# 38. Content Completeness & 9-Point Readiness Checklist
 
-The Media Team UI may display a content completeness indicator.
+The Media Team UI integrates the `ContentCompletenessBadge` component (`src/components/media-team/ContentCompletenessBadge.tsx`), which evaluates a 9-point readiness checklist:
 
-Example:
-
-```text id="3z8n1w"
-Movie Setup
-
-████████████████░░ 80%
-
-✓ Basic information
-✓ Poster
-✓ Category
-✓ Country
-✓ DJ version
-⚠ Download media
+```ts
+export interface ContentReadinessChecklist {
+  basicInfo: boolean;       // title, description, release year, duration
+  poster: boolean;          // vertical 2:3 poster artwork URL
+  backdrop: boolean;        // horizontal 16:9 backdrop banner URL
+  trailer: boolean;         // trailer media URL / teaser
+  categories: boolean;      // >= 1 taxonomy category selected
+  countries: boolean;       // >= 1 country of origin selected
+  djAssigned: boolean;      // translating DJ voice artist assigned
+  streamingMedia: boolean;  // streamingStatus === 'ready'
+  downloadMedia: boolean;   // downloadStatus === 'ready'
+}
 ```
 
-This is a productivity feature, not a replacement for backend validation.
+### Readiness Formula
+
+```ts
+const calculateCompleteness = (checklist: ContentReadinessChecklist): number => {
+  const items = Object.values(checklist);
+  const completed = items.filter(Boolean).length;
+  return Math.round((completed / items.length) * 100);
+};
+```
+
+### Visual Feedback
+* **100% Complete**: Emerald badge `"Ready for Live"` with checkmark. Content meets all criteria to enter the Review Queue or go live.
+* **80% - 99%**: Yellow/Amber badge `"Almost Ready"`. Minor non-blocking assets pending.
+* **< 80%**: Rose/Red badge `"Needs Attention"`. Essential media or metadata missing before submission.
+* Hovering or clicking the badge reveals a popover breakdown of all 9 criteria with instantaneous pass/fail status.
 
 ---
 

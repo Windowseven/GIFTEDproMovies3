@@ -682,16 +682,16 @@ Route:
 
 Admin can:
 
-* create categories
-* edit categories
-* archive categories
-* manage category names
-* manage category slugs
-* view associated content
+* create categories (name, description, display priority order)
+* edit category details and display order
+* toggle active/inactive status (hides from customer discovery without breaking existing relationships)
+* manage category names and descriptions
+* view associated content count (`contentCount`)
 
-Categories should remain consistent with the discovery system.
-
-Deleting a category should be treated carefully because movies and series may depend on it.
+### Smart Delete Safeguard
+Deleting a category is protected by a safety barrier:
+- If `contentCount === 0`: Category can be permanently removed with standard confirmation.
+- If `contentCount > 0`: Hard deletion triggers a smart safeguard modal warning that movies/series are linked to this taxonomy. The modal provides a 1-click **"Deactivate Instead"** option, which deactivates the category from discovery rails while keeping existing catalog relationships intact.
 
 ---
 
@@ -1610,21 +1610,21 @@ Published
 Archived
 ```
 
-If Media Team approval is later selected:
+When Media Team approval is active (`publishingRequiresApproval === true` in `/admin/settings`):
 
 ```text
 Media Team
     ↓
-Draft
+Draft (Catalog Intake Wizard)
     ↓
-Submitted
+Submitted for Review ('pending_review' / 'READY_FOR_REVIEW')
     ↓
-Admin Review
+Admin Review Queue (/admin/movies or /admin/series)
     ↓
-Published
+Approve & Publish ('published' / 'PUBLISHED')
 ```
 
-The second workflow remains a **pending business decision**.
+This workflow is fully implemented and governed by `adminPlatformSettings.publishingRequiresApproval`. If disabled, the Media Team can publish directly to live status. Administrators retain override authority to publish, unpublish, or archive any title at any time.
 
 ---
 
@@ -1966,34 +1966,32 @@ Every major Admin feature should define:
 
 ---
 
-# 80. Pending Business Decisions
+# 80. Resolved Operational & Governance Rules
 
-The following remain unresolved and must not be silently invented:
+The primary governance decisions have been finalized and implemented in the Admin control panel:
 
-### 1. Media Team Approval
+### 1. Media Team Approval (RESOLVED & IMPLEMENTED)
 
-Does Media Team content require Admin approval before publishing?
+Governed dynamically via `adminPlatformSettings.publishingRequiresApproval` (toggleable in `/admin/settings`):
+- When `true`, titles uploaded by Media Team enter `'pending_review'` (`READY_FOR_REVIEW`) and require Administrator sign-off via "Approve & Publish" in `/admin/movies` or `/admin/series`.
+- When `false`, Media Team can publish directly to live status.
 
-### 2. Series Pricing
+### 2. Series Pricing (RESOLVED & IMPLEMENTED)
 
-Which pricing model is final?
+Governed via `AdminSeries.pricingModel` (`'per_episode' | 'per_season' | 'full_series' | 'combination'`), supported by `AdminSeason.seasonPassPriceTsh` (default 3,500 TSh) and `AdminEpisode.streamPriceTsh` / `downloadPriceTsh`.
 
-```text
-Per Episode
-Per Season
-Full Series
-Combination
-```
+### 3. Payment Providers (RESOLVED & IMPLEMENTED)
 
-### 3. Payment Providers
+Supported payment providers in `PaymentMethod`:
+- M-Pesa (Vodacom)
+- Tigo Pesa (Yas / Tigo)
+- Airtel Money
+- HaloPesa
+- Credit / Debit Cards
 
-Which Tanzania Mobile Money providers will be supported?
+### 4. Maximum Active Devices (RESOLVED & IMPLEMENTED)
 
-### 4. Maximum Active Devices
-
-How many devices may a customer use simultaneously?
-
-These decisions should be configurable in the architecture where practical.
+Controlled centrally in `/admin/settings` via `adminPlatformSettings.maxActiveDevicesPerUser` (default: 3 devices) and tracked dynamically per customer in `CustomerDevice`.
 
 ---
 
