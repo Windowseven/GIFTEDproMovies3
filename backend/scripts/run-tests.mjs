@@ -17,9 +17,13 @@ const databaseTestFiles = new Set([
   "catalog-polymorphic-domain.integration.test.js",
   "catalog-security-attacks.test.js",
   "catalog-stage4-adversarial.test.js",
+  "commercial-runtime.test.js",
   "database.integration.test.js",
   "google-auth-http.integration.test.js",
+  "orders-concurrency.test.js",
+  "orders-runtime.test.js",
 ]);
+
 
 function getTestDatabaseUrl() {
   if (process.env.APP_ENV === "production") {
