@@ -1,7 +1,7 @@
 # GIFTEDproMovies — Backend Project Progress
 
-> **Phase Milestones & Verification History**  
-> **Last Updated:** 2026-09-30  
+> **Phase Milestones & Verification History**<br>
+> **Last Updated:** 2026-10-08
 
 ---
 
@@ -243,3 +243,159 @@
     - [x] ADR-034 direct-SQL residual risk explicitly accepted.
     - [x] Acceptance Date: **2026-10-06**.
     - [x] Formal Status: **PHASE 3C — PRODUCT OWNER ACCEPTED AND CLOSED**.
+
+---
+
+## Phase 4: Commercial Foundation
+* **Overall Status:** **IN PROGRESS**
+* **Milestones Completed & Closed:**
+  - [x] Architecture & Domain Decisions: Formal architectural alignment codified in `docs/architecture/` (ARCH-001–006, ARCH-015, ARCH-017). **CLOSED**.
+  - [x] Commercial Schema Design: Canonical schema design codified in `docs/architecture/PHASE_4_SCHEMA_DESIGN.md`. All entity names, casing, types, and constraints verified. Passed independent verification (Schema Attack #3). **CLOSED**.
+  - [x] Migration Plan: Full migration strategy from Phase 3C baseline (`0004`) to Phase 4 head (`0011`) codified in `docs/architecture/PHASE_4_MIGRATION_PLAN.md`. Passed independent verification (Migration Re-Attack #2). **CLOSED**.
+  - [x] Database Migration Layer Implementation:
+    - [x] `0005_phase4_plan_primitives.sql`: Commercial enums (`commercial_target_kind`, `commercial_policy_type`, `duration_unit`, `offer_status`, `order_status`, etc.), `access_plans`, `plan_versions` with positive integer checks and unique keys.
+    - [x] `0006_phase4_offers_and_live_policy.sql`: `offers`, `offer_catalog_policy_category_members`, `offer_catalog_policy_content_members`, integer TZS pricing (`price_tzs >= 0`), target shape constraint (`offers_target_shape_check`).
+    - [x] `0007_phase4_snapshots_and_orders.sql`: `commercial_policy_snapshots`, snapshot categories/contents members, `orders` with immutable purchase terms.
+    - [x] `0008_phase4_payment_and_settlement.sql`: `payment_attempts`, `settlements` with provider references and immutable settlement facts.
+    - [x] `0009_phase4_fulfillments.sql`: `fulfillments` table with one row per order.
+    - [x] `0010_phase4_entitlements_and_effects.sql`: `entitlements`, `entitlement_order_effects` preserving exact-target extension semantics.
+    - [x] `0011_phase4_trigger_integrity.sql`: Database triggers for commercial target validation, catalog hierarchy mutation guards, deferred offer policy cardinality triggers, snapshot ownership triggers, plan version immutability (`phase4_trg_guard_plan_version_mutation`), snapshot immutability, order purchase terms immutability, and settlement immutability.
+    - [x] Migration Status: **IMPLEMENTED & CLOSED**.
+
+### Phase 4 Runtime Task #1: Access Plans, Immutable Plan Versions & Offers
+* **Status:** **APPROVED BY PRODUCT OWNER & CLOSED**
+* **Scope Completed:**
+  - [x] Access Plans Administrative Management:
+    - Code validation (`^[A-Z0-9][A-Z0-9_-]{0,63}$`) and uniqueness enforcement (`409 ACCESS_PLAN_CODE_ALREADY_EXISTS`).
+    - Bounded name length (1–255 characters).
+    - Administrative listing and retrieval endpoints (`GET /admin/commercial/access-plans`, `GET /admin/commercial/access-plans/:id`).
+  - [x] Immutable Plan Versions Management:
+    - Parent access plan existence verification (`404 ACCESS_PLAN_NOT_FOUND`).
+    - Strict positive integer version number and duration value enforcement (`version_number > 0`, `duration_value > 0`).
+    - Version number uniqueness within access plan (`409 PLAN_VERSION_CONFLICT`).
+    - Finite duration units strictly constrained to `HOUR` and `DAY`.
+    - Quota options: `download_limit`, `download_limit_type` (`UNIQUE_TITLES` | `DOWNLOAD_ACTIONS`), `device_limit`, `concurrent_stream_limit`.
+    - Zero mutation endpoints exposed (no `PUT`, `PATCH`, or `DELETE`).
+    - Database engine-level immutability enforced by non-bypassable BEFORE UPDATE/DELETE trigger `phase4_trg_guard_plan_version_mutation`.
+  - [x] Commercial Offers Management:
+    - Code validation and uniqueness enforcement (`409 OFFER_CODE_ALREADY_EXISTS`).
+    - Bounded name length (1–255 characters).
+    - Strict non-negative integer TZS pricing (`price_tzs >= 0`; `1` stored unit = `1` TZS; no floating-point / decimal values).
+    - Future date window validation (`endsAt > startsAt`).
+    - Exact referenced immutable plan version validation (`404 PLAN_VERSION_NOT_FOUND`).
+    - Target shape validation enforcing mutual exclusivity across scopes (`MOVIE`, `SERIES`, `SEASON`, `EPISODE`, `CATALOG`):
+      - `MOVIE`: Points to content with `contentType = 'movie'`.
+      - `SERIES`: Points to content with `contentType = 'series'`.
+      - `SEASON`: Season exists and belongs to series with `contentType = 'series'`.
+      - `EPISODE`: Episode exists, belongs to season, which belongs to series with `contentType = 'series'`.
+      - `CATALOG`: All typed target columns null; requires valid `catalogPolicyType`.
+    - Normalized live catalog policy membership handling (`offer_catalog_policy_category_members`, `offer_catalog_policy_content_members`):
+      - Cardinality enforced: `ALL_CATALOG` (0 categories, 0 content items), `CATEGORY_SET` ($\ge 1$ categories, 0 content items), `CONTENT_SET` ($\ge 1$ content items, 0 categories).
+      - Pre-insertion database existence verification for referenced category and content IDs (`findCategoryById`, `findContentById`), returning structured HTTP 422 (`OfferPolicyValidationException`) to prevent unhandled database foreign key errors.
+      - Composite primary keys preventing duplicate membership.
+  - [x] Offer Lifecycle & State Machine:
+    - Status values: `draft`, `active`, `inactive`, `archived`.
+    - Valid transitions: `draft` -> `active`, `inactive`, `archived`; `active` -> `inactive`, `archived`; `inactive` -> `active`, `archived`.
+    - Terminal archival: `archived` offers are permanently immutable and cannot be reactivated or mutated.
+  - [x] Security, Authorization & Input Hygiene:
+    - Admin-only boundary: `CommercialController` guarded at class level by `@UseGuards(SessionAuthGuard, RolesGuard)` and `@Roles("admin")`.
+    - Strict rejection of unauthenticated requests (HTTP 401), non-admin roles `customer` and `media_team` (HTTP 403), and suspended/deactivated/unverified accounts.
+    - Mass assignment protection: Global `ValidationPipe` (`whitelist: true`, `forbidNonWhitelisted: true`, `forbidUnknownValues: true`) actively rejects unexpected payload attributes with HTTP 400.
+    - Nested DTO array validation: Array member UUID format enforced via `@IsUUID("4", { each: true })`.
+  - [x] Fail-Closed Transactional Audit Logging:
+    - Append-only audit events (`ACCESS_PLAN_CREATE`, `PLAN_VERSION_CREATE`, `OFFER_CREATE`, `OFFER_STATUS_UPDATE`) executed within atomic database transactions (`tx`) with `failClosed: true`.
+    - Any audit write failure immediately aborts the transaction and rolls back database state.
+  - [x] Resolved Verification Finding — Money Validation Defect:
+    - Discovered that `@Type(() => Number)` on `CreateOfferDto.priceTzs` previously coerced string numbers (`"1500"`) into numeric types before integer validation.
+    - Removed `@Type(() => Number)` decorator; with global `enableImplicitConversion: false`, uncoerced string inputs remain strings and fail `@IsInt()`.
+    - Enforced contract: Accept numeric `0` (201) and positive integers `2000` (201). Reject `-1` (400), `1.5` (400), `"1500"` (400), `"1.5"` (400), `"abc"` (400), `true` (400), `null` (400), `NaN` (400), and `Infinity` (400).
+* **Verification Evidence:**
+  - [x] Static Verification Quality Gates:
+    - `pnpm run test:compile`: PASS (Exit 0)
+    - `pnpm run typecheck`: PASS (Exit 0)
+    - `pnpm run build`: PASS (Exit 0)
+    - `pnpm run lint`: PASS (Exit 0)
+    - `git diff --check`: PASS (Exit 0)
+  - [x] Targeted Commercial Runtime Test Suite (`tests/commercial-runtime.test.ts`):
+    - Canonical test runner (`node scripts/run-tests.mjs commercial-runtime.test.js`) with complete database reset and migrations `0000 → 0011`:
+    - Run #1: 8 passed / 0 failed / 0 skipped
+    - Run #2: 8 passed / 0 failed / 0 skipped (repeatability confirmed)
+  - [x] Full Backend Regression Test Suite (`pnpm test`):
+    - 39 test suites executed with canonical migration resets: 265 passed / 0 failed / 0 skipped.
+  - [x] Independent Adversarial Security & Integrity Attack:
+    - Verdict: **PASS — ZERO BLOCKING VULNERABILITIES REMAIN**.
+    - Evaluated across 15 attack categories:
+      1. Authorization / RBAC bypass
+      2. IDOR / mass assignment
+      3. Target-kind and hierarchy confusion
+      4. Catalog policy confusion
+      5. Offer lifecycle bypass
+      6. Plan-version immutability
+      7. Duplicate plan/version/offer handling
+      8. Transaction atomicity and fail-closed audit
+      9. Validation and money handling
+      10. Repository/service/controller separation
+      11. Concurrency/race conditions
+      12. Database error leakage
+      13. Accidental mutation of immutable historical data
+      14. Test reset / lifecycle reproducibility
+      15. Scope creep into future commercial domains
+* **Product Owner Acceptance:**
+  - Explicit Product Owner acceptance received: **Phase 4 Runtime Task #1 APPROVED & CLOSED**.
+
+### Phase 4 Runtime Task #2: Orders
+* **Status:** **APPROVED BY PRODUCT OWNER & CLOSED**
+* **Scope Completed:**
+  - [x] Customer Order Placement (`POST /api/v1/orders`):
+    - Authenticated customer boundary: Customer role verified (`SessionAuthGuard`, `RolesGuard`, `VerifiedUserGuard`). Non-customers (HTTP 403) and unverified accounts strictly blocked.
+    - Strict input validation: Offer UUID format, idempotency key (1–128 characters), and mass assignment rejection (HTTP 400).
+    - Server-authoritative purchase terms copying: Price, plan version ID, duration, and target kind copied directly from active offer; zero trust in client parameters.
+    - Purchasability validation: Active status enforcement, starts-at / ends-at window checks, linked plan version existence validation.
+  - [x] Immutable Historical Policy Snapshots:
+    - Pre-computed point-in-time snapshots created for all CATALOG offers (`ALL_CATALOG`, `CATEGORY_SET`, `CONTENT_SET`).
+    - Normalized snapshot membership tables: `commercial_policy_snapshot_categories` and `commercial_policy_snapshot_contents`.
+    - Engine-level immutability enforced by triggers (`phase4_trg_guard_snapshot_mutation`, `phase4_trg_guard_snapshot_categories_mutation`, `phase4_trg_guard_snapshot_contents_mutation`).
+    - Deferred integrity triggers: `phase4_validate_snapshot_ownership_and_cardinality` rejects orphan snapshots and mismatched cardinalities at commit time.
+  - [x] Concurrency & Transactional Consistency:
+    - Transaction isolation configured to `{ isolationLevel: "repeatable read" }` across order creation transactions.
+    - Eliminates snapshot inconsistencies where concurrent category mutations, content status changes, or content-category links could bleed into point-in-time catalog resolution.
+    - Handled PostgreSQL SQLSTATE `40001` (`could not serialize access due to concurrent update`) with a bounded exponential backoff retry loop (up to 3 attempts).
+    - Re-checks customer/idempotency key state before each retry to ensure idempotent safety if a racing concurrent request already succeeded.
+  - [x] Idempotency & Conflict Safety:
+    - Unique compound constraint `orders_customer_idempotency_unique (customer_id, idempotency_key)`.
+    - Safe idempotent replay returning existing order when offer matches.
+    - Mismatched offer under identical idempotency key rejected with structured HTTP 409 (`OrderIdempotencyConflictException`).
+    - High-concurrency race condition polling and deduplication handling (`23505` uniqueness violation retry).
+  - [x] Customer Order Retrieval (`GET /api/v1/orders/:id`):
+    - Strict customer-scoped lookup (`findOrderByIdForCustomer`).
+    - Anti-IDOR protection: Order belonging to a different customer returns HTTP 404 (`OrderNotFoundException`), preventing enumeration.
+  - [x] Atomic Audit Logging:
+    - Append-only audit record (`ORDER_CREATE`) written inside the same database transaction with `failClosed: true`.
+* **Verification Evidence:**
+  - [x] Static Quality Gates:
+    - `pnpm run test:compile`: PASS (Exit 0)
+    - `pnpm run typecheck`: PASS (Exit 0)
+    - `pnpm run build`: PASS (Exit 0)
+    - `pnpm run lint`: PASS (Exit 0)
+    - `git diff --check`: PASS (Exit 0)
+  - [x] Orders Functional Runtime Test Suite (`tests/orders-runtime.test.ts`):
+    - 11/11 tests passing across repeated runs against canonical PostgreSQL 16 container (`giftedpro_phase1_test`).
+  - [x] Orders Deterministic Concurrency Test Suite (`tests/orders-concurrency.test.ts`):
+    - Tests A–D: Real PostgreSQL multi-connection transaction coordination validating category removal isolation, content publication isolation, content-category association isolation, and empty category resolution.
+    - Test E: Deterministic SQLSTATE `40001` serialization conflict induction and transparent retry recovery.
+    - 6/6 tests passing across repeated runs (0 hangs, 0 deadlocks, clean timeout guards).
+  - [x] Full Backend Regression Test Suite:
+    - 33 test files executed against canonical PostgreSQL 16 container: 100% PASS (0 failures, 0 regressions).
+  - [x] Independent Adversarial Review:
+    - Formal verdict: `PASS — REMEDIATION INDEPENDENTLY VERIFIED`.
+* **Product Owner Acceptance:**
+  - Explicit Product Owner acceptance received: **Phase 4 Runtime Task #2 APPROVED & CLOSED**.
+
+### Upcoming Phase 4 Runtime Milestones:
+* [x] **Runtime Task #1: Access Plans, Immutable Plan Versions & Offers** — **APPROVED & CLOSED**
+* [x] **Runtime Task #2: Orders** — **APPROVED & CLOSED**
+* [ ] **Runtime Task #3: Payment Attempts & Confirmation** — **NOT STARTED / NEXT**
+* [ ] **Settlements & Reconciliation** — **NOT STARTED**
+* [ ] **Fulfillments Engine** — **NOT STARTED**
+* [ ] **Entitlements & Order Effects Engine** — **NOT STARTED**
+* [ ] **Access Evaluation & Playback Integration Contract** — **NOT STARTED**

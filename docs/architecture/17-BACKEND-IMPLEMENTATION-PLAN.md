@@ -186,29 +186,29 @@ Apply this checklist to every phase, adding the phase-specific checks listed bel
   * Zero scope contamination from Phase 4+ (no commerce, pricing, payments, or DRM code).
   * Phase 3C formally closed on 2026-10-06. Ready for Phase 4 authorization.
 
-### Phase 4 — Commercial offers, orders, subscriptions, and entitlement rules
+### Phase 4 — Commercial offers, orders, finite access plans, and entitlement rules
 
 **Objective:** Define the server-owned commercial transaction and access rules independently of any payment vendor.
 
-**Scope:** Admin-controlled price/offer configuration for applicable movie, episode, season, full-series, and subscription units; order and purchase intent; manual one-time subscription plan purchases; eligible catalog policy; immutable plan/version/purchased subscription terms including price, currency, duration, download policy and applicable device/concurrent-stream policy; individual purchase access starts at entitlement activation and backend-owned expiry; grants/revocation; access evaluation; commercial status and audit. No recurring billing and no refund/chargeback workflow.
+**Scope:** Admin-controlled offers for exactly MOVIE, SERIES, SEASON, EPISODE, and CATALOG scopes; finite-duration Admin-defined access plans with immutable versions; purchase orders and policy snapshots; catalog eligibility; individual access starts at entitlement activation and has backend-owned finite expiry; grants/revocation; access evaluation; commercial status and audit. V1 access-plan duration units are HOUR and DAY. No recurring plan or auto-billing model and no refund/chargeback workflow.
 
-**Dependencies:** Phases 1–3. Resolve unverified-account purchase eligibility, repeated purchase/entitlement uniqueness semantics, exact subscription plan/version representation, and price/tax treatment required for a correct quoted commercial amount. Currency TZS and Tanzania launch market are accepted; tax treatment and actual prices are not implied. This phase may define payment-ready orders before a provider is chosen.
+**Dependencies:** Phases 1–3. Purchases require verified authenticated customer accounts. Preserve exact-target entitlement uniqueness and extension/idempotency semantics. Currency is integer TZS (`1` stored unit = `1` TZS); tax treatment remains outside this schema design. This phase may define payment-ready orders before a provider is chosen.
 
-**Database impact:** Offer/price records and versioned plan terms; orders/order items; subscription purchase snapshot; entitlements with starts/expires/revoked state and source; eligibility/download policy; audit history. Constraints must preserve immutable purchased terms and separate catalog state, payment state, fulfillment state, and grant state. A later payment attempt may be one-to-many per order. Define deduplication/unique grant constraints only after policy resolution.
+**Database impact:** `access_plans`, immutable `plan_versions`, `offers`, `offer_catalog_policy_category_members`, `offer_catalog_policy_content_members`, order-owned `commercial_policy_snapshots` and their category/content members, `orders`, `payment_attempts`, `settlements`, `fulfillments`, `entitlements`, and `entitlement_order_effects`; one purchase per order (no order items). Constraints preserve immutable purchased terms and separate catalog state, payment state, fulfillment state, and grant state. The [Phase 4 schema design](./PHASE_4_SCHEMA_DESIGN.md) records the approved entity and state contract. The [Phase 4 migration plan](./PHASE_4_MIGRATION_PLAN.md) maps that contract onto the actual Phase 3C migration head at `0004`; it is planning only and does not authorize migration or implementation.
 
-**API surface:** Admin commercial offer/plan management; customer authenticated offer quote and order creation/status; customer owned subscription/purchase/library access view; access evaluation contract for internal Playback module. No guessed endpoint paths. Never accept client-supplied authoritative price, terms, expiry, or eligibility.
+**API surface:** Admin offer/access-plan management; verified customer offer quote and order creation/status; customer-owned entitlement/library view; access evaluation contract for internal Playback module. No guessed endpoint paths. Never accept client-supplied authoritative price, terms, expiry, or eligibility.
 
-**Security:** Authenticated, verified-eligible customer purchase; ownership enforcement on orders/subscriptions/library; Admin-only commercial edits; immutable snapshot protection; avoid price tampering/replay; audit manual grant/revoke and plan edits; prevent access checks from leaking another account’s library.
+**Security:** Verified, authenticated and non-suspended customer purchase; ownership enforcement on orders/entitlements/library; Admin-only commercial edits; immutable snapshot protection; avoid price tampering/replay; audit manual grant/revoke and plan edits; prevent access checks from leaking another account’s library.
 
 **Async/background work:** No payment fulfillment yet. Durable events may be recorded only as needed for later payment integration; do not mark an order paid from client actions. Expiry is evaluated from server-owned timestamps; a cleanup job is not required for correctness.
 
 **External dependencies:** No live payment provider required. Provider selection becomes a hard blocker at the start of Phase 5 live payment work. Drizzle/query layer decision must already be recorded in Phase 1.
 
-**Testing:** Unit tests for eligibility, scope inheritance (episode/season/full series), subscription validity and immutable terms, manual renewal using current terms, individual access survival after subscription expiration, price snapshots, lifecycle-independent access; PostgreSQL constraints and transaction tests; owner/Admin API tests; concurrency tests for duplicate order/grant attempts; regression.
+**Testing:** Unit tests for eligibility, scope inheritance (movie editions, series/season/episode hierarchy, and catalog policy), immutable plan-version terms, finite expiry and exact-target extension, integer TZS snapshots, and lifecycle-independent access; PostgreSQL constraints and transaction tests; owner/Admin API tests; concurrency tests for duplicate order/grant attempts; regression.
 
 **Security testing:** Price/term tampering, cross-customer order BOLA, unauthorized Admin pricing, duplicate request/replay, privilege escalation, access through unpublished/archived content where entitlement remains valid, entitlement overgrant through hierarchy confusion.
 
-**Documentation:** Update ARCH-002/004/006/015/016 and OpenAPI; document unresolved uniqueness/repeat purchase and tax policy; preserve refund feature as deferred.
+**Documentation:** Update ARCH-002/004/006/015/016 and OpenAPI; document approved exact-target uniqueness and entitlement effect idempotency; preserve refund feature as deferred.
 
 **Phase-specific DoD:** Reusable DoD plus immutable commercial snapshot verification and successful tests demonstrating catalog unpublish/archive does not revoke valid customer access.
 
