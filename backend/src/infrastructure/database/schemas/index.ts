@@ -19,3 +19,4 @@ export * from "./episodes.schema.js";
 export * from "./content-taxonomies.schema.js";
 export * from "./content-review-notes.schema.js";
 export * from "./system-settings.schema.js";
+export * from "./commercial.schema.js";

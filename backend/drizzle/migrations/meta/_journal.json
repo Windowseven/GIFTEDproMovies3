@@ -36,6 +36,55 @@
       "when": 1791152319569,
       "tag": "0004_chunky_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791200000005,
+      "tag": "0005_phase4_plan_primitives",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791200000006,
+      "tag": "0006_phase4_offers_and_live_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791200000007,
+      "tag": "0007_phase4_snapshots_and_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791200000008,
+      "tag": "0008_phase4_payment_and_settlement",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791200000009,
+      "tag": "0009_phase4_fulfillments",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791200000010,
+      "tag": "0010_phase4_entitlements_and_effects",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791200000011,
+      "tag": "0011_phase4_trigger_integrity",
+      "breakpoints": true
     }
   ]
 }
