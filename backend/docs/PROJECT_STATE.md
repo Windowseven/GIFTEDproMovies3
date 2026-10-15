@@ -48,7 +48,7 @@
 ## 3. Pending Decisions & Gates
 
 * **Phase 2 Google Extension:** **COMPLETE & VERIFIED LIVE**.
-* **Phase 3C:** **ACCEPTED BY PRODUCT OWNER & FORMALLY CLOSED (2026-10-06)**. All engineering stages (0 through 7) complete.
+* **Phase 3C:** **ACCEPTED BY PRODUCT OWNER & FORMALLY CLOSED (2026-10-06)**. All engineering stages (0 through 7) complete. Phase 3 Review Watchlist (all 5 items: error-code discrepancies, download-media behavior, pending/unverified-account coverage, audit-event evidence, test-setup duplicate-key isolation) audited, verified, and formally resolved (2026-10-15).
 * **Phase 4 Status:** **IN PROGRESS**. Architecture, schema design, migration plan, and migrations `0005–0011` are CLOSED. **Runtime Task #1 (Access Plans, Immutable Plan Versions, Offers) is APPROVED BY PRODUCT OWNER & CLOSED**. **Runtime Task #2 (Orders) is APPROVED BY PRODUCT OWNER & CLOSED**. **Runtime Task #3 (Payment Attempts & Confirmation) is APPROVED BY PRODUCT OWNER & CLOSED**. Runtime Task #4 (Settlement & Reconciliation) is **NOT STARTED / NEXT**. Remaining Phase 4 areas (Settlements, Fulfillments, Entitlements) are NOT STARTED.
 * **Payment Provider:** Pending evaluation before Phase 5.
 * **Media Provider:** Cloudflare Stream / R2 provisional pending validation before Phase 6.

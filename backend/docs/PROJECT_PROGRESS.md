@@ -244,6 +244,38 @@
     - [x] Acceptance Date: **2026-10-06**.
     - [x] Formal Status: **PHASE 3C — PRODUCT OWNER ACCEPTED AND CLOSED**.
 
+### Phase 3 Review Watchlist Formal Resolution (2026-10-15)
+* **Status:** **ALL 5 WATCHLIST ITEMS AUDITED, VERIFIED & CLEARED**
+* **Outcomes & Verifications:**
+  - [x] **1. Error-Code Discrepancies:**
+    - Inspected `catalog.errors.ts`, `api-exception.filter.ts`, and `PHASE_3C_STAGE_1_REFINED_DESIGN.md`.
+    - Confirmed `NOT_FOUND` (404) is consistently returned across catalog endpoints and verified by `catalog-functional-verification.test.ts` (line 1334) and `auth-phase3-integration.test.ts` (line 711).
+    - Confirmed global exception filter `STATUS_DETAILS` intentionally maps unhandled guard errors to canonical `REQUEST_REJECTED` (401/403) while preserving domain-specific exception payload codes (`SLUG_ALREADY_EXISTS`, `TAXONOMY_IN_USE`, `DEFAULT_EDITION_REQUIRED`, `SERIES_INITIAL_CONTENT_REQUIRED`, etc.).
+    - Verdict: **VERIFIED & CLEARED (No breaking changes required; existing contract consistent)**.
+  - [x] **2. Download-Media Behavior:**
+    - Inspected `content-lifecycle.service.ts` publication readiness engine and movie edition failure handler.
+    - Confirmed 9-point publication readiness checklist strictly enforces `downloadMedia` (default edition for movies and S1E1 for series must have `downloadStatus === 'ready'` and a non-empty `downloadFileKey`).
+    - Confirmed movie edition failure Case A strictly requires replacement editions to have `downloadStatus === 'ready'`.
+    - Verified by `catalog-functional-verification.test.ts` Domain B.9 (line 557) and Domain E.7 (line 793).
+    - Verdict: **VERIFIED & CLEARED**.
+  - [x] **3. Pending/Unverified-Account Coverage:**
+    - Inspected `session-auth.guard.ts` central account status gate.
+    - Confirmed accounts with `status === 'pending_verification'` are strictly blocked with HTTP 403 on all non-`@AllowUnverified` routes.
+    - Confirmed all staff catalog and taxonomy controllers require active authenticated staff accounts without `@AllowUnverified`.
+    - Verified by `authorization-guards.test.ts` (lines 148, 192), `catalog-stage4-adversarial.test.ts` (Attack A.4, lines 295–315), and `auth-phase3-integration.test.ts` (Suite 1).
+    - Verdict: **VERIFIED & CLEARED**.
+  - [x] **4. Audit-Event Evidence:**
+    - Inspected `polymorphic-catalog.service.ts`, `content-lifecycle.service.ts`, and `taxonomy.service.ts`.
+    - Confirmed all state mutations execute within database transactions and call `AuditService.recordEvent({ tx, failClosed: true })`.
+    - Verified transactional rollback on audit write failure in `catalog-polymorphic-domain.integration.test.ts` (line 613), `catalog-functional-verification.test.ts` (Domain H.2, line 1158), and `catalog-stage4-adversarial.test.ts` (Attack L.1, line 900).
+    - Verdict: **VERIFIED & CLEARED**.
+  - [x] **5. Database Test Setup — Duplicate-Key Failures:**
+    - Investigated previously reported duplicate-key failures during multi-suite test runs.
+    - Confirmed root cause: shared database state between integration suites inserting deterministic static slugs/codes (`action-cinema`, `TZ`, `dj-afro`).
+    - Confirmed resolution: `scripts/run-tests.mjs` executes per-suite PostgreSQL schema resets (`DROP SCHEMA public CASCADE; CREATE SCHEMA public; drizzle-kit migrate`).
+    - Verified clean execution across all 13 database test suites with 0 duplicate key errors.
+    - Verdict: **VERIFIED & RESOLVED**.
+
 ---
 
 ## Phase 4: Commercial Foundation
