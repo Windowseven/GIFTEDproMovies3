@@ -10,7 +10,9 @@ import {
   offerCatalogPolicyContentMembersTable,
   offersTable,
   ordersTable,
+  paymentAttemptsTable,
   planVersionsTable,
+  settlementsTable,
 } from "../../infrastructure/database/schemas/commercial.schema.js";
 import { categoriesTable } from "../../infrastructure/database/schemas/categories.schema.js";
 import { contentTable } from "../../infrastructure/database/schemas/content.schema.js";
@@ -24,10 +26,14 @@ import type {
   NewCommercialPolicySnapshotRecord,
   NewOfferRecord,
   NewOrderRecord,
+  NewPaymentAttemptRecord,
   NewPlanVersionRecord,
+  NewSettlementRecord,
   OfferRecord,
   OrderRecord,
+  PaymentAttemptRecord,
   PlanVersionRecord,
+  SettlementRecord,
 } from "../../infrastructure/database/schemas/commercial.schema.js";
 
 @Injectable()
@@ -306,6 +312,170 @@ export class CommercialRepository {
       );
 
     return rows.map((r) => r.contentId);
+  }
+
+
+  async findPaymentAttemptById(
+    client: DatabaseClient,
+    attemptId: string,
+  ): Promise<PaymentAttemptRecord | null> {
+    const [row] = await client
+      .select()
+      .from(paymentAttemptsTable)
+      .where(eq(paymentAttemptsTable.id, attemptId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findPaymentAttemptsForOrder(
+    client: DatabaseClient,
+    orderId: string,
+  ): Promise<PaymentAttemptRecord[]> {
+    return client
+      .select()
+      .from(paymentAttemptsTable)
+      .where(eq(paymentAttemptsTable.orderId, orderId))
+      .orderBy(paymentAttemptsTable.attemptNumber);
+  }
+
+  async findActiveUnresolvedAttemptForOrder(
+    client: DatabaseClient,
+    orderId: string,
+  ): Promise<PaymentAttemptRecord | null> {
+    const [row] = await client
+      .select()
+      .from(paymentAttemptsTable)
+      .where(
+        and(
+          eq(paymentAttemptsTable.orderId, orderId),
+          inArray(paymentAttemptsTable.status, ["PENDING", "UNKNOWN"]),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async getMaxAttemptNumberForOrder(
+    client: DatabaseClient,
+    orderId: string,
+  ): Promise<number> {
+    const rows = await client
+      .select({ attemptNumber: paymentAttemptsTable.attemptNumber })
+      .from(paymentAttemptsTable)
+      .where(eq(paymentAttemptsTable.orderId, orderId));
+
+    if (rows.length === 0) return 0;
+    return Math.max(...rows.map((r) => r.attemptNumber));
+  }
+
+  async insertPaymentAttempt(
+    client: DatabaseClient,
+    values: NewPaymentAttemptRecord,
+  ): Promise<PaymentAttemptRecord> {
+    const [row] = await client.insert(paymentAttemptsTable).values(values).returning();
+    return row!;
+  }
+
+  async updatePaymentAttemptStatus(
+    client: DatabaseClient,
+    id: string,
+    status: "PENDING" | "UNKNOWN" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "EXPIRED",
+    providerEventId?: string,
+    providerReference?: string,
+  ): Promise<PaymentAttemptRecord> {
+    const updateValues: Partial<NewPaymentAttemptRecord> = {
+      status,
+      updatedAt: new Date(),
+    };
+    if (providerEventId !== undefined) {
+      updateValues.providerEventId = providerEventId;
+    }
+    if (providerReference !== undefined) {
+      updateValues.providerReference = providerReference;
+    }
+
+    const [row] = await client
+      .update(paymentAttemptsTable)
+      .set(updateValues)
+      .where(eq(paymentAttemptsTable.id, id))
+      .returning();
+
+    return row!;
+  }
+
+  async findPaymentAttemptByProviderEvent(
+    client: DatabaseClient,
+    providerName: string,
+    providerEventId: string,
+  ): Promise<PaymentAttemptRecord | null> {
+    const [row] = await client
+      .select()
+      .from(paymentAttemptsTable)
+      .where(
+        and(
+          eq(paymentAttemptsTable.providerName, providerName),
+          eq(paymentAttemptsTable.providerEventId, providerEventId),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findSettlementByProviderEvent(
+    client: DatabaseClient,
+    providerName: string,
+    providerEventId: string,
+  ): Promise<SettlementRecord | null> {
+    const [row] = await client
+      .select()
+      .from(settlementsTable)
+      .where(
+        and(
+          eq(settlementsTable.providerName, providerName),
+          eq(settlementsTable.providerEventId, providerEventId),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findSettlementByPaymentAttemptId(
+    client: DatabaseClient,
+    paymentAttemptId: string,
+  ): Promise<SettlementRecord | null> {
+    const [row] = await client
+      .select()
+      .from(settlementsTable)
+      .where(eq(settlementsTable.paymentAttemptId, paymentAttemptId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async insertSettlement(
+    client: DatabaseClient,
+    values: NewSettlementRecord,
+  ): Promise<SettlementRecord> {
+    const [row] = await client.insert(settlementsTable).values(values).returning();
+    return row!;
+  }
+
+  async updateOrderStatus(
+    client: DatabaseClient,
+    orderId: string,
+    status: "PENDING_PAYMENT" | "PAID" | "EXPIRED" | "CANCELLED",
+  ): Promise<OrderRecord> {
+    const [row] = await client
+      .update(ordersTable)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(ordersTable.id, orderId))
+      .returning();
+
+    return row!;
   }
 }
 

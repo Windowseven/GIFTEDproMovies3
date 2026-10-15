@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgEnum, pgTable, timestamp, uuid, varchar, integer, uniqueIndex, index } from "drizzle-orm/pg-core";
 
 export const commercialTargetKindEnum = pgEnum("commercial_target_kind", [
@@ -210,4 +211,69 @@ export type CommercialPolicySnapshotContentRecord = typeof commercialPolicySnaps
 
 export type OrderRecord = typeof ordersTable.$inferSelect;
 export type NewOrderRecord = typeof ordersTable.$inferInsert;
+
+export const paymentAttemptStatusEnum = pgEnum("payment_attempt_status", [
+  "PENDING",
+  "UNKNOWN",
+  "SUCCEEDED",
+  "FAILED",
+  "CANCELLED",
+  "EXPIRED",
+]);
+
+export const paymentAttemptsTable = pgTable(
+  "payment_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    attemptNumber: integer("attempt_number").notNull(),
+    providerName: varchar("provider_name", { length: 64 }).notNull(),
+    providerReference: varchar("provider_reference", { length: 128 }),
+    providerEventId: varchar("provider_event_id", { length: 128 }),
+    status: paymentAttemptStatusEnum("status").notNull().default("PENDING"),
+    amountTzs: integer("amount_tzs").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("payment_attempts_order_attempt_unique").on(table.orderId, table.attemptNumber),
+    uniqueIndex("payment_attempts_provider_event_unique").on(table.providerName, table.providerEventId),
+    uniqueIndex("payment_attempts_provider_reference_idx").on(table.providerName, table.providerReference),
+    uniqueIndex("payment_attempts_single_unresolved_idx")
+      .on(table.orderId)
+      .where(sql`"status" IN ('PENDING', 'UNKNOWN')`),
+    index("payment_attempts_order_id_idx").on(table.orderId),
+    index("payment_attempts_status_idx").on(table.status),
+  ],
+);
+
+export const settlementsTable = pgTable(
+  "settlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    paymentAttemptId: uuid("payment_attempt_id")
+      .notNull()
+      .references(() => paymentAttemptsTable.id),
+    providerName: varchar("provider_name", { length: 64 }).notNull(),
+    providerEventId: varchar("provider_event_id", { length: 128 }).notNull(),
+    providerReference: varchar("provider_reference", { length: 128 }).notNull(),
+    amountTzs: integer("amount_tzs").notNull(),
+    settledAt: timestamp("settled_at", { withTimezone: true }).notNull().defaultNow(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("settlements_payment_attempt_id_unique").on(table.paymentAttemptId),
+    uniqueIndex("settlements_provider_event_unique").on(table.providerName, table.providerEventId),
+    index("settlements_provider_reference_idx").on(table.providerReference),
+    index("settlements_settled_at_idx").on(table.settledAt),
+  ],
+);
+
+export type PaymentAttemptRecord = typeof paymentAttemptsTable.$inferSelect;
+export type NewPaymentAttemptRecord = typeof paymentAttemptsTable.$inferInsert;
+
+export type SettlementRecord = typeof settlementsTable.$inferSelect;
+export type NewSettlementRecord = typeof settlementsTable.$inferInsert;
 

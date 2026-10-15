@@ -9,9 +9,11 @@ import {
 import { CommercialController } from "./commercial.controller.js";
 import { OrderService } from "./order.service.js";
 import { OrdersController } from "./orders.controller.js";
+import { PaymentService } from "./payment.service.js";
+import { PaymentsController } from "./payments.controller.js";
 
 @Module({
-  controllers: [CommercialController, OrdersController],
+  controllers: [CommercialController, OrdersController, PaymentsController],
   providers: [
     CommercialRepository,
     AccessPlanService,
@@ -19,8 +21,9 @@ import { OrdersController } from "./orders.controller.js";
     OfferService,
     CommercialService,
     OrderService,
+    PaymentService,
   ],
-  exports: [CommercialRepository, CommercialService, OrderService],
+  exports: [CommercialRepository, CommercialService, OrderService, PaymentService],
 })
 export class CommercialModule {}
 

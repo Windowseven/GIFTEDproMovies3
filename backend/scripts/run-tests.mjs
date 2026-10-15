@@ -22,6 +22,7 @@ const databaseTestFiles = new Set([
   "google-auth-http.integration.test.js",
   "orders-concurrency.test.js",
   "orders-runtime.test.js",
+  "payments-runtime.test.js",
 ]);
 
 

@@ -156,3 +156,87 @@ export class OrderIdempotencyConflictException extends HttpException {
   }
 }
 
+export class OrderAlreadyPaidException extends HttpException {
+  constructor(message = "This order has already been paid.") {
+    super(
+      {
+        code: "ORDER_ALREADY_PAID",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class OrderNotPayableException extends HttpException {
+  constructor(message = "Order is not in a payable state.") {
+    super(
+      {
+        code: "ORDER_NOT_PAYABLE",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class ActivePaymentAttemptExistsException extends HttpException {
+  constructor(message = "An active unresolved payment attempt already exists for this order.") {
+    super(
+      {
+        code: "ACTIVE_PAYMENT_ATTEMPT_EXISTS",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class PaymentAttemptNotFoundException extends HttpException {
+  constructor(message = "The requested payment attempt was not found.") {
+    super(
+      {
+        code: "PAYMENT_ATTEMPT_NOT_FOUND",
+        message,
+      },
+      HttpStatus.NOT_FOUND,
+    );
+  }
+}
+
+export class InvalidPaymentAttemptTransitionException extends HttpException {
+  constructor(message = "Invalid payment attempt status transition.") {
+    super(
+      {
+        code: "INVALID_PAYMENT_ATTEMPT_TRANSITION",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class PaymentAmountMismatchException extends HttpException {
+  constructor(message = "Confirmed payment amount does not match expected order amount.") {
+    super(
+      {
+        code: "PAYMENT_AMOUNT_MISMATCH",
+        message,
+      },
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class ProviderReferenceCollisionException extends HttpException {
+  constructor(message = "Unable to generate unique provider reference; please retry.") {
+    super(
+      {
+        code: "PROVIDER_REFERENCE_COLLISION",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
