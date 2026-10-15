@@ -1,7 +1,7 @@
 # GIFTEDproMovies — Backend Project Progress
 
 > **Phase Milestones & Verification History**<br>
-> **Last Updated:** 2026-10-08
+> **Last Updated:** 2026-10-15
 
 ---
 
@@ -391,11 +391,63 @@
 * **Product Owner Acceptance:**
   - Explicit Product Owner acceptance received: **Phase 4 Runtime Task #2 APPROVED & CLOSED**.
 
+### Phase 4 Runtime Task #3: Payment Attempts & Confirmation
+* **Status:** **APPROVED BY PRODUCT OWNER & CLOSED**
+* **Scope Completed:**
+  - [x] Customer Payment Attempt Initiation (`POST /api/v1/orders/:orderId/payment-attempts`):
+    - Authenticated customer boundary: Guarded by `@UseGuards(SessionAuthGuard, RolesGuard, VerifiedUserGuard)` and `@Roles("customer")` (C-1). Non-customers (HTTP 403) and unverified accounts strictly blocked.
+    - Customer order ownership validation: Anti-IDOR lookup (`findOrderByIdForCustomer`) returns HTTP 404 (`OrderNotFoundException`) if order belongs to a different customer.
+    - Server-authoritative amount copying: Copies exact `order.priceTzs` to `payment_attempts.amountTzs`; zero trust in client-supplied amounts.
+    - Order state validation: Rejects attempt creation if order is not in `PENDING_PAYMENT` status (`409 INVALID_ORDER_TRANSITION`).
+    - Single-in-flight unresolved attempt enforcement: Backed by PostgreSQL partial unique index `payment_attempts_single_unresolved_idx (order_id) WHERE status IN ('PENDING', 'UNKNOWN')`. Concurrent or duplicate unresolved attempt creation returns structured HTTP 409 (`ActivePaymentAttemptExistsException`).
+    - Monotonic sequential attempt numbering: Scoped per order, calculated as `max(attempt_number) + 1` inside transaction, backed by unique constraint `payment_attempts_order_attempt_unique (order_id, attempt_number)`.
+    - Random provider reference generation: Generates `pay_ref_<uuid_prefix>` with collision detection and bounded exponential retry loop (up to 3 attempts). Exhaustion fails closed with structured HTTP 409 (`ProviderReferenceCollisionException`).
+    - Repeatable read isolation & 40001 retry: Runs inside `{ isolationLevel: "repeatable read" }` with automatic retry on SQLSTATE `40001` serialization conflicts.
+  - [x] Simulated Payment Confirmation (`POST /api/v1/payment-attempts/:id/simulate-confirm`):
+    - Admin-only simulation boundary: Guarded by `@UseGuards(SessionAuthGuard, RolesGuard)` and `@Roles("admin")` (C-1). Customers and media team strictly forbidden (HTTP 403).
+    - Strict input validation: Bounded `providerEventId` (1–255 chars), `providerReference` (1–255 chars), positive integer `amountTzs` (`@IsInt()`, `@Min(1)`), and outcome enum (`SUCCEEDED` | `FAILED`) (M-1).
+    - Server-authoritative amount validation: Confirmed amount must exactly match stored attempt amount; mismatch rejected with structured HTTP 422 (`PaymentAmountMismatchException`).
+    - Concurrency & row-level locking: Acquires exclusive row locks `FOR UPDATE` on `payment_attempts` then `orders` inside transaction.
+    - Atomic order transition: Transition to `SUCCEEDED` atomically updates parent order `status` to `PAID` within the same transaction.
+    - Terminal state transition immutability: Attempts in terminal states (`FAILED`, `CANCELLED`, `EXPIRED`, or `SUCCEEDED`) reject state mutation with HTTP 409 (`InvalidPaymentAttemptTransitionException`).
+    - Idempotent duplicate event replay: Resending identical `providerEventId` with matching `outcome = 'SUCCEEDED'` returns existing record with `idempotentReplay: true` (HTTP 200). Conflicting event or outcome on already confirmed attempt rejected with HTTP 409.
+  - [x] Customer Payment Attempts Listing (`GET /api/v1/orders/:orderId/payment-attempts`):
+    - Customer-scoped retrieval with Anti-IDOR ownership validation.
+  - [x] Fail-Closed Transactional Audit Logging:
+    - Writes `PAYMENT_ATTEMPT_CREATE` and `PAYMENT_ATTEMPT_CONFIRM` append-only audit events inside the transaction with `failClosed: true`.
+  - [x] Concurrency & Lock-Contention Proof (Test 12 Hardening):
+    - Deterministic advisory barrier attached to `BEFORE UPDATE ON orders` holds winning transaction holding row locks.
+    - Exact winning transaction PID identified via `pg_locks WHERE locktype = 'advisory' AND granted = false`.
+    - Competing confirmation requests empirically verified blocked in PostgreSQL engine queue using `pg_stat_activity` with `WHERE array[winningPid] <@ pg_blocking_pids(pid) AND wait_event_type = 'Lock' AND (query ILIKE '%payment_attempts%' OR query ILIKE '%orders%')`.
+    - Barrier released only after empirical lock contention is established.
+    - Robust `finally` teardown releases barrier, settles in-flight promises via `Promise.allSettled`, and cleanly drops temporary trigger and function without leaking test resources.
+* **Verification Evidence:**
+  - [x] Static Quality Gates:
+    - `pnpm run test:compile`: PASS (Exit 0)
+    - `pnpm run typecheck`: PASS (Exit 0)
+    - `pnpm run build`: PASS (Exit 0)
+    - `pnpm run lint`: PASS (Exit 0)
+    - `git diff --check`: PASS (Exit 0)
+  - [x] Payments Functional & Concurrency Runtime Test Suite (`tests/payments-runtime.test.ts`):
+    - 17/17 tests passing across repeated runs against canonical PostgreSQL 16 container (`giftedpro_phase1_test`).
+    - Verified across 3 consecutive standalone test runs and 5-run stability loop (100% pass, 0 flakes).
+  - [x] Full Backend Regression Test Suite (`run-tests.mjs`):
+    - All backend test suites executed against canonical PostgreSQL 16 container: 100% PASS (0 failures, 0 regressions).
+  - [x] Cleanliness & Teardown Verification:
+    - 0 lingering advisory locks in PostgreSQL.
+    - 0 lingering test triggers or test functions.
+  - [x] Independent Adversarial Review:
+    - Formal verdict: `PASS — TEST 12 CONCURRENCY PROOF VERIFIED`.
+* **Product Owner Acceptance:**
+  - Explicit Product Owner acceptance received: **Phase 4 Runtime Task #3 APPROVED & CLOSED**.
+
 ### Upcoming Phase 4 Runtime Milestones:
 * [x] **Runtime Task #1: Access Plans, Immutable Plan Versions & Offers** — **APPROVED & CLOSED**
 * [x] **Runtime Task #2: Orders** — **APPROVED & CLOSED**
-* [ ] **Runtime Task #3: Payment Attempts & Confirmation** — **NOT STARTED / NEXT**
-* [ ] **Settlements & Reconciliation** — **NOT STARTED**
+* [x] **Runtime Task #3: Payment Attempts & Confirmation** — **APPROVED & CLOSED**
+* [ ] **Runtime Task #4: Settlements & Reconciliation** — **NOT STARTED / NEXT**
 * [ ] **Fulfillments Engine** — **NOT STARTED**
 * [ ] **Entitlements & Order Effects Engine** — **NOT STARTED**
 * [ ] **Access Evaluation & Playback Integration Contract** — **NOT STARTED**
+
+> **Note on Task Boundaries:** Phase 4 Runtime Task #4 (Settlements & Reconciliation) and downstream tasks have strictly **NOT** been started. No settlement writing logic, entitlement grants, or fulfillment transitions have been implemented.
