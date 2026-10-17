@@ -23,6 +23,7 @@ const databaseTestFiles = new Set([
   "orders-concurrency.test.js",
   "orders-runtime.test.js",
   "payments-runtime.test.js",
+  "reconciliation-runtime.test.js",
 ]);
 
 

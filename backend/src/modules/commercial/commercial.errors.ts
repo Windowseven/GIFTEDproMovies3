@@ -240,3 +240,50 @@ export class ProviderReferenceCollisionException extends HttpException {
   }
 }
 
+export class ProviderReferenceConflictException extends HttpException {
+  constructor(message = "Provider reference does not match persisted payment attempt.") {
+    super(
+      {
+        code: "PROVIDER_REFERENCE_CONFLICT",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class SettlementConflictException extends HttpException {
+  constructor(message = "Settlement invariant conflict or invalid settlement state.") {
+    super(
+      {
+        code: "SETTLEMENT_CONFLICT",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class DuplicateEventConflictException extends HttpException {
+  constructor(message = "Provider event ID has already been processed for another payment attempt.") {
+    super(
+      {
+        code: "DUPLICATE_EVENT_CONFLICT",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class ConcurrentAttemptConflictException extends HttpException {
+  constructor(message = "Concurrent attempt sequence conflict; please retry.") {
+    super(
+      {
+        code: "CONCURRENT_ATTEMPT_CONFLICT",
+        message,
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}

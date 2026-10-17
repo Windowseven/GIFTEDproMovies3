@@ -11,9 +11,16 @@ import { OrderService } from "./order.service.js";
 import { OrdersController } from "./orders.controller.js";
 import { PaymentService } from "./payment.service.js";
 import { PaymentsController } from "./payments.controller.js";
+import { ReconciliationService } from "./reconciliation.service.js";
+import { ReconciliationController } from "./reconciliation.controller.js";
 
 @Module({
-  controllers: [CommercialController, OrdersController, PaymentsController],
+  controllers: [
+    CommercialController,
+    OrdersController,
+    PaymentsController,
+    ReconciliationController,
+  ],
   providers: [
     CommercialRepository,
     AccessPlanService,
@@ -22,8 +29,15 @@ import { PaymentsController } from "./payments.controller.js";
     CommercialService,
     OrderService,
     PaymentService,
+    ReconciliationService,
   ],
-  exports: [CommercialRepository, CommercialService, OrderService, PaymentService],
+  exports: [
+    CommercialRepository,
+    CommercialService,
+    OrderService,
+    PaymentService,
+    ReconciliationService,
+  ],
 })
 export class CommercialModule {}
 

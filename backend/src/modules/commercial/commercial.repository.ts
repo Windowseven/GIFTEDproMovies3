@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
 import type { DatabaseClient } from "../../infrastructure/database/database.module.js";
+export type { DatabaseClient };
 import {
   accessPlansTable,
   commercialPolicySnapshotCategoriesTable,
@@ -417,6 +418,25 @@ export class CommercialRepository {
         and(
           eq(paymentAttemptsTable.providerName, providerName),
           eq(paymentAttemptsTable.providerEventId, providerEventId),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findPaymentAttemptByProviderReference(
+    client: DatabaseClient,
+    providerName: string,
+    providerReference: string,
+  ): Promise<PaymentAttemptRecord | null> {
+    const [row] = await client
+      .select()
+      .from(paymentAttemptsTable)
+      .where(
+        and(
+          eq(paymentAttemptsTable.providerName, providerName),
+          eq(paymentAttemptsTable.providerReference, providerReference),
         ),
       )
       .limit(1);

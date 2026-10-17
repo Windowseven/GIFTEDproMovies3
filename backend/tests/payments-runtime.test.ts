@@ -435,14 +435,17 @@ test("Payments & Settlements runtime verification suite", async (t) => {
     assert.equal(result.order.status, "PAID");
     assert.equal(result.idempotentReplay, false);
     assert.equal(result.attempt.providerEventId, providerEventId);
-    assert.equal((result as Record<string, unknown>).settlement, undefined);
+    assert.ok(result.settlement);
+    assert.equal(result.settlement.paymentAttemptId, attempt.id);
+    assert.equal(result.settlement.amountTzs, 6000);
 
-    // Verify in database: settlement row is NOT created in Task #3 (H-1)
+    // Verify in database: settlement row is created in Task #4
     const dbSettlement = await pool.query(
       "SELECT * FROM settlements WHERE payment_attempt_id = $1",
       [attempt.id],
     );
-    assert.equal(dbSettlement.rowCount, 0);
+    assert.equal(dbSettlement.rowCount, 1);
+
 
     // Verify in database: order status is PAID
     const dbOrder = await pool.query("SELECT status, amount_tzs FROM orders WHERE id = $1", [orderId]);
@@ -561,6 +564,9 @@ test("Payments & Settlements runtime verification suite", async (t) => {
     });
     assert.equal(firstRes.statusCode, 200);
     assert.equal(firstRes.json().data.idempotentReplay, false);
+    assert.ok(firstRes.json().data.settlement);
+    assert.equal(firstRes.json().data.settlement.paymentAttemptId, attempt.id);
+    assert.equal(firstRes.json().data.settlement.amountTzs, 6000);
 
     // Second identical confirmation (duplicate webhook/provider event replay)
     const secondRes = await app.inject({
@@ -571,7 +577,9 @@ test("Payments & Settlements runtime verification suite", async (t) => {
     });
     assert.equal(secondRes.statusCode, 200);
     assert.equal(secondRes.json().data.idempotentReplay, true);
-    assert.equal((secondRes.json().data as Record<string, unknown>).settlement, undefined);
+    assert.ok(secondRes.json().data.settlement);
+    assert.equal(secondRes.json().data.settlement.id, firstRes.json().data.settlement.id);
+
 
     // Verify exactly ONE audit event exists for PAYMENT_ATTEMPT_CONFIRM (no duplicate audit logs on replay)
     const auditCount = await pool.query(
