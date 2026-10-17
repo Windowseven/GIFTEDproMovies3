@@ -35,3 +35,21 @@ Record frontend contradictions that must be addressed during a separately author
 ## Implementation boundary
 
 This list is for a future UI alignment task. It does not specify route paths, visual design, endpoint contracts, or additional notification triggers. Exact endpoint contracts are defined separately in ARCH-004; pending media/download/session/notification policies remain pending in ARCH-016. Do not invent download retry semantics, email templates, token lifetimes, or refund behavior in the UI.
+
+## Future UI & Interaction References
+
+### Dqnamo Receipt Printer
+- **Reference:** [https://www.dqnamo.com/experiments/receipt-printer](https://www.dqnamo.com/experiments/receipt-printer)
+- **Component:** Dqnamo Receipt Printer
+- **Context & Future Role:** Future UI/interaction reference for a receipt-printing simulation, especially where a relevant checkout or payment-success experience exists in GIFTEDproMovies.
+- **Demonstrated Features:**
+  - A simulated receipt printer and receipt-paper animation.
+  - Processing, printing, and completion states.
+  - An itemized receipt and payment confirmation.
+  - An animated interaction that makes the payment-success experience more tangible.
+- **Status & Important Constraints:**
+  - **Marked as a future consideration only — not approved for implementation yet.**
+  - Must not expand the current task's scope.
+  - This is currently a design reference only. Do not assume it provides actual physical-printer integration.
+  - Do not install, copy, or integrate it during this task.
+  - Review its implementation compatibility and reuse/licensing terms before adopting any code.

@@ -53,6 +53,19 @@ Every phase follows the required loop, with a gate that prevents scope from accu
 
 Functional tests establish domain behavior and failure handling. Security tests attempt to bypass the relevant trust boundary. Fixes are followed by targeted retests and the complete regression suite from all prior phases. Documentation is updated from the implemented behavior and approved decisions. The exit gate is recorded before work begins on a dependent phase. A failed gate returns the phase to fix/retest; it does not defer known failures to a final hardening pass.
 
+### 3.1. Workflow for future features requiring UI work
+
+For any future feature that requires UI work, the following workflow must be followed:
+1. **Identify Relevant UI Fix Entries:** Identify the relevant existing UI Fix MD entries (`docs/frontend/UI-FIXES-AND-ALIGNMENT.md`) before starting feature integration.
+2. **Review UI Requirements & References:** Review the required UI, states, layouts, and interactions against the documented fixes and references.
+3. **UI-First Implementation:** Implement and review the relevant UI changes first, within the approved feature scope.
+4. **Verify UI States & Tests:** Verify the UI states and relevant tests.
+5. **Proceed to Backend Integration:** Only then proceed with the corresponding backend/API or other feature integration.
+6. **Post-Integration Re-check:** Re-check the UI against the existing UI Fix MD after integration and address any resulting UI discrepancies within the authorized scope.
+7. **Document Undefined Dependencies:** If the UI depends on backend data or behaviour that has not yet been defined, document the dependency rather than inventing behaviour or building misleading UI.
+
+> **Note on Authority:** The existing UI Fix MD (`docs/frontend/UI-FIXES-AND-ALIGNMENT.md`) remains the single source of truth for UI fixes and references. This implementation plan points to it and does not duplicate its contents.
+
 ## 4. Reusable Definition of Done (DoD)
 
 Apply this checklist to every phase, adding the phase-specific checks listed below.
