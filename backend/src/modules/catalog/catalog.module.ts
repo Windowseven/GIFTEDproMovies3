@@ -7,16 +7,19 @@ import { TaxonomyService } from "./services/taxonomy.service.js";
 import { SystemSettingsService } from "./services/system-settings.service.js";
 import { CatalogController } from "./controllers/catalog.controller.js";
 import { TaxonomyController } from "./controllers/taxonomy.controller.js";
+import { CustomerCatalogController } from "./controllers/customer-catalog.controller.js";
+import { CustomerCatalogService } from "./services/customer-catalog.service.js";
 
 @Module({
   imports: [NotificationsModule],
-  controllers: [CatalogController, TaxonomyController],
+  controllers: [CatalogController, TaxonomyController, CustomerCatalogController],
   providers: [
     CatalogRepository,
     PolymorphicCatalogService,
     ContentLifecycleService,
     TaxonomyService,
     SystemSettingsService,
+    CustomerCatalogService,
   ],
   exports: [
     CatalogRepository,
@@ -24,6 +27,7 @@ import { TaxonomyController } from "./controllers/taxonomy.controller.js";
     ContentLifecycleService,
     TaxonomyService,
     SystemSettingsService,
+    CustomerCatalogService,
   ],
 })
 export class CatalogModule {}

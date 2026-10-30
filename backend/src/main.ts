@@ -1,10 +1,12 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import type { IncomingMessage } from "node:http";
 import type { Http2ServerRequest } from "node:http2";
 import type { DestinationStream } from "pino";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { LogController } from "fastify";
 import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
 import fastifyHelmet from "@fastify/helmet";
@@ -15,6 +17,7 @@ import { ApplicationLogger } from "./infrastructure/logging/application-logger.j
 import { createStructuredLogger } from "./infrastructure/logging/structured-logger.js";
 import { ApiExceptionFilter } from "./http/api-exception.filter.js";
 import { configureHttpApplication } from "./http/configure-http-application.js";
+import { createRateLimiterHook } from "./http/rate-limiter.js";
 
 export async function createApplication(
   environment: EnvironmentConfig = loadEnvironment(process.env),
@@ -44,7 +47,7 @@ export async function createApplication(
         ? [...environment.trustedProxyCidrs]
         : false,
     bodyLimit: environment.requestBodyLimitBytes,
-    disableRequestLogging: true,
+    logController: new LogController({ disableRequestLogging: true }),
   });
 
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -69,6 +72,7 @@ export async function createApplication(
   fastify.addHook("onRequest", async (request, reply) => {
     reply.header("x-request-id", request.id);
   });
+  fastify.addHook("onRequest", createRateLimiterHook(environment));
   fastify.addHook("onResponse", async (request, reply) => {
     request.log.info(
       {
@@ -93,6 +97,16 @@ function configureOpenApi(
   environment: EnvironmentConfig,
 ): void {
   if (environment.appEnvironment === "production") return;
+
+  const require = createRequire(import.meta.url);
+  try {
+    require.resolve("@fastify/static");
+  } catch {
+    app.getHttpAdapter().getInstance().log.warn(
+      "OpenAPI/Swagger UI skipped: @fastify/static is not installed in local environment.",
+    );
+    return;
+  }
 
   const options = new DocumentBuilder()
     .setTitle("GIFTEDproMovies Backend API")

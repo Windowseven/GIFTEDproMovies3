@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgEnum, pgTable, timestamp, uuid, varchar, integer, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, timestamp, uuid, varchar, integer, text, uniqueIndex, index } from "drizzle-orm/pg-core";
 
 export const commercialTargetKindEnum = pgEnum("commercial_target_kind", [
   "MOVIE",
@@ -276,4 +276,163 @@ export type NewPaymentAttemptRecord = typeof paymentAttemptsTable.$inferInsert;
 
 export type SettlementRecord = typeof settlementsTable.$inferSelect;
 export type NewSettlementRecord = typeof settlementsTable.$inferInsert;
+
+export const fulfillmentStatusEnum = pgEnum("fulfillment_status", [
+  "PENDING",
+  "COMPLETED",
+  "FAILED_RETRYABLE",
+  "FAILED_TERMINAL",
+]);
+
+export const fulfillmentsTable = pgTable(
+  "fulfillments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    status: fulfillmentStatusEnum("status").notNull().default("PENDING"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastErrorCode: varchar("last_error_code", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("fulfillments_order_id_unique").on(table.orderId),
+    index("fulfillments_status_idx").on(table.status),
+    index("fulfillments_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export type FulfillmentRecord = typeof fulfillmentsTable.$inferSelect;
+export type NewFulfillmentRecord = typeof fulfillmentsTable.$inferInsert;
+
+export const entitlementStatusEnum = pgEnum("entitlement_status", [
+  "ACTIVE",
+  "EXPIRED",
+  "REVOKED",
+]);
+
+export const entitlementEffectKindEnum = pgEnum("entitlement_effect_kind", [
+  "CREATED",
+  "EXTENDED",
+]);
+
+export const entitlementsTable = pgTable(
+  "entitlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customerId: uuid("customer_id").notNull(),
+    targetKind: commercialTargetKindEnum("target_kind").notNull(),
+    targetMovieContentId: uuid("target_movie_content_id"),
+    targetSeriesContentId: uuid("target_series_content_id"),
+    targetSeasonId: uuid("target_season_id"),
+    targetEpisodeId: uuid("target_episode_id"),
+    status: entitlementStatusEnum("status").notNull().default("ACTIVE"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revocationReason: text("revocation_reason"),
+    revokedBy: uuid("revoked_by"),
+  },
+  (table) => [
+    uniqueIndex("entitlements_customer_movie_idx")
+      .on(table.customerId, table.targetMovieContentId)
+      .where(sql`"target_kind" = 'MOVIE' AND "target_movie_content_id" IS NOT NULL`),
+    uniqueIndex("entitlements_customer_series_idx")
+      .on(table.customerId, table.targetSeriesContentId)
+      .where(sql`"target_kind" = 'SERIES' AND "target_series_content_id" IS NOT NULL`),
+    uniqueIndex("entitlements_customer_season_idx")
+      .on(table.customerId, table.targetSeasonId)
+      .where(sql`"target_kind" = 'SEASON' AND "target_season_id" IS NOT NULL`),
+    uniqueIndex("entitlements_customer_episode_idx")
+      .on(table.customerId, table.targetEpisodeId)
+      .where(sql`"target_kind" = 'EPISODE' AND "target_episode_id" IS NOT NULL`),
+    uniqueIndex("entitlements_customer_catalog_idx")
+      .on(table.customerId)
+      .where(sql`"target_kind" = 'CATALOG'`),
+    index("entitlements_customer_id_idx").on(table.customerId),
+    index("entitlements_status_expires_at_idx").on(table.status, table.expiresAt),
+    index("entitlements_target_movie_content_id_idx").on(table.targetMovieContentId),
+    index("entitlements_target_series_content_id_idx").on(table.targetSeriesContentId),
+    index("entitlements_target_season_id_idx").on(table.targetSeasonId),
+    index("entitlements_target_episode_id_idx").on(table.targetEpisodeId),
+  ],
+);
+
+export type EntitlementRecord = typeof entitlementsTable.$inferSelect;
+export type NewEntitlementRecord = typeof entitlementsTable.$inferInsert;
+
+export const entitlementOrderEffectsTable = pgTable(
+  "entitlement_order_effects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    entitlementId: uuid("entitlement_id")
+      .notNull()
+      .references(() => entitlementsTable.id),
+    effectKind: entitlementEffectKindEnum("effect_kind").notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAtAfter: timestamp("expires_at_after", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("entitlement_order_effects_order_id_unique").on(table.orderId),
+    index("entitlement_order_effects_entitlement_id_idx").on(table.entitlementId),
+  ],
+);
+
+export type EntitlementOrderEffectRecord = typeof entitlementOrderEffectsTable.$inferSelect;
+export type NewEntitlementOrderEffectRecord = typeof entitlementOrderEffectsTable.$inferInsert;
+
+export const catalogGrantsTable = pgTable(
+  "catalog_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    entitlementId: uuid("entitlement_id")
+      .notNull()
+      .references(() => entitlementsTable.id),
+    predecessorOrderId: uuid("predecessor_order_id").references(() => ordersTable.id),
+    validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("catalog_grants_order_id_unique").on(table.orderId),
+    index("catalog_grants_entitlement_window_idx").on(table.entitlementId, table.validUntil),
+    index("catalog_grants_predecessor_order_id_idx").on(table.predecessorOrderId),
+  ],
+);
+
+export type CatalogGrantRecord = typeof catalogGrantsTable.$inferSelect;
+export type NewCatalogGrantRecord = typeof catalogGrantsTable.$inferInsert;
+
+export const catalogGrantRevocationsTable = pgTable(
+  "catalog_grant_revocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }).notNull().defaultNow(),
+    revocationReason: text("revocation_reason").notNull(),
+    revokedBy: uuid("revoked_by"),
+  },
+  (table) => [
+    uniqueIndex("catalog_grant_revocations_order_id_unique").on(table.orderId),
+  ],
+);
+
+export type CatalogGrantRevocationRecord = typeof catalogGrantRevocationsTable.$inferSelect;
+export type NewCatalogGrantRevocationRecord = typeof catalogGrantRevocationsTable.$inferInsert;
+
 

@@ -27,6 +27,29 @@ export interface EnvironmentConfig {
   readonly emailWorkerBaseBackoffMs: number;
   readonly emailWorkerMaxBackoffMs: number;
   readonly emailWorkerJitterMs: number;
+  readonly paymentProvider?: "palmpesa" | "clickpesa" | "simulated";
+  readonly palmpesaApiToken?: string;
+  readonly palmpesaSigningSecret?: string;
+  readonly palmpesaBaseUrl?: string;
+  readonly clickPesaClientId?: string;
+  readonly clickPesaApiKey?: string;
+  readonly clickPesaWebhookSecret?: string;
+  readonly clickPesaBaseUrl?: string;
+  readonly transcodeWebhookSecret?: string;
+  readonly paymentReconciliationWorkerEnabled?: boolean;
+  readonly paymentReconciliationPollIntervalMs?: number;
+  readonly paymentReconciliationBatchSize?: number;
+  readonly paymentReconciliationStaleThresholdMinutes?: number;
+  readonly playbackSigningSecret?: string;
+  readonly playbackSigningKeyId?: string;
+  readonly playbackTokenTtlSeconds?: number;
+  readonly customerStreamingEnabled?: boolean;
+  readonly mediaStorageProvider?: "simulator" | "r2";
+  readonly r2AccountId?: string;
+  readonly r2AccessKeyId?: string;
+  readonly r2SecretAccessKey?: string;
+  readonly r2BucketName?: string;
+  readonly r2Endpoint?: string;
 }
 
 export class InvalidEnvironmentError extends Error {
@@ -352,6 +375,22 @@ function parseBoolean(
   throw new InvalidEnvironmentError(key, "must be a boolean (true or false)");
 }
 
+function parseMediaStorageProvider(
+  env: NodeJS.ProcessEnv,
+): "simulator" | "r2" {
+  const raw = env.MEDIA_STORAGE_PROVIDER?.trim().toLowerCase();
+  if (raw === undefined || raw === "") {
+    return "simulator";
+  }
+  if (raw === "simulator" || raw === "r2") {
+    return raw;
+  }
+  throw new InvalidEnvironmentError(
+    "MEDIA_STORAGE_PROVIDER",
+    "must be either 'simulator' or 'r2'",
+  );
+}
+
 export function loadEnvironment(
   env: NodeJS.ProcessEnv,
 ): EnvironmentConfig {
@@ -446,6 +485,102 @@ export function loadEnvironment(
     }
   }
 
+  const paymentProviderRaw = env.PAYMENT_PROVIDER?.trim().toLowerCase();
+  let paymentProvider: "palmpesa" | "clickpesa" | "simulated" | undefined;
+  if (paymentProviderRaw) {
+    if (
+      paymentProviderRaw !== "palmpesa" &&
+      paymentProviderRaw !== "clickpesa" &&
+      paymentProviderRaw !== "simulated"
+    ) {
+      throw new InvalidEnvironmentError(
+        "PAYMENT_PROVIDER",
+        "must be one of 'palmpesa', 'clickpesa', or 'simulated'",
+      );
+    }
+    if (rawEnvironment === "production" && paymentProviderRaw === "simulated") {
+      throw new InvalidEnvironmentError(
+        "PAYMENT_PROVIDER",
+        "simulator is not permitted in production",
+      );
+    }
+    paymentProvider = paymentProviderRaw as "palmpesa" | "clickpesa" | "simulated";
+  }
+
+  const palmpesaApiToken = env.PALMPESA_API_TOKEN?.trim() || undefined;
+  const palmpesaSigningSecret = env.PALMPESA_SIGNING_SECRET?.trim() || undefined;
+  const palmpesaBaseUrl = env.PALMPESA_BASE_URL?.trim() || undefined;
+  if (palmpesaBaseUrl) {
+    try {
+      const parsed = new URL(palmpesaBaseUrl);
+      if (rawEnvironment === "production" && parsed.protocol !== "https:") {
+        throw new InvalidEnvironmentError(
+          "PALMPESA_BASE_URL",
+          "must use HTTPS in production",
+        );
+      }
+    } catch (err: unknown) {
+      if (err instanceof InvalidEnvironmentError) throw err;
+      throw new InvalidEnvironmentError("PALMPESA_BASE_URL", "must be a valid URL");
+    }
+  }
+
+  if (rawEnvironment === "production") {
+    if (paymentProvider === "palmpesa") {
+      if (!palmpesaApiToken) {
+        throw new InvalidEnvironmentError(
+          "PALMPESA_API_TOKEN",
+          "is required in production when PAYMENT_PROVIDER is 'palmpesa'",
+        );
+      }
+      if (!palmpesaSigningSecret) {
+        throw new InvalidEnvironmentError(
+          "PALMPESA_SIGNING_SECRET",
+          "is required in production when PAYMENT_PROVIDER is 'palmpesa'",
+        );
+      }
+    }
+    if (
+      paymentProvider === "clickpesa" &&
+      (!env.CLICKPESA_API_KEY?.trim() || !env.CLICKPESA_CLIENT_ID?.trim())
+    ) {
+      throw new InvalidEnvironmentError(
+        "CLICKPESA_API_KEY",
+        "is required in production when PAYMENT_PROVIDER is 'clickpesa'",
+      );
+    }
+  }
+
+  const mediaStorageProvider = parseMediaStorageProvider(env);
+  const r2AccountId = env.CLOUDFLARE_ACCOUNT_ID?.trim() || undefined;
+  const r2AccessKeyId = env.R2_ACCESS_KEY_ID?.trim() || undefined;
+  const r2SecretAccessKey = env.R2_SECRET_ACCESS_KEY?.trim() || undefined;
+  const r2BucketName = env.R2_BUCKET_NAME?.trim() || "giftedpro-staging-media-downloads";
+  const r2Endpoint =
+    env.R2_ENDPOINT?.trim() ||
+    (r2AccountId ? `https://${r2AccountId}.r2.cloudflarestorage.com` : undefined);
+
+  if (mediaStorageProvider === "r2") {
+    if (!r2AccountId) {
+      throw new InvalidEnvironmentError(
+        "CLOUDFLARE_ACCOUNT_ID",
+        "is required when MEDIA_STORAGE_PROVIDER is 'r2'",
+      );
+    }
+    if (!r2AccessKeyId) {
+      throw new InvalidEnvironmentError(
+        "R2_ACCESS_KEY_ID",
+        "is required when MEDIA_STORAGE_PROVIDER is 'r2'",
+      );
+    }
+    if (!r2SecretAccessKey) {
+      throw new InvalidEnvironmentError(
+        "R2_SECRET_ACCESS_KEY",
+        "is required when MEDIA_STORAGE_PROVIDER is 'r2'",
+      );
+    }
+  }
+
   return {
     appEnvironment: rawEnvironment,
     port: parseInteger(env, "PORT", 8000, 1, 65_535),
@@ -516,5 +651,68 @@ export function loadEnvironment(
       0,
       5000,
     ),
+    paymentProvider,
+    palmpesaApiToken,
+    palmpesaSigningSecret,
+    palmpesaBaseUrl,
+    clickPesaClientId: env.CLICKPESA_CLIENT_ID?.trim() || undefined,
+    clickPesaApiKey: env.CLICKPESA_API_KEY?.trim() || undefined,
+    clickPesaWebhookSecret: env.CLICKPESA_WEBHOOK_SECRET?.trim() || undefined,
+    clickPesaBaseUrl: env.CLICKPESA_BASE_URL?.trim() || undefined,
+    transcodeWebhookSecret:
+      env.TRANSCODE_WEBHOOK_SECRET?.trim() ||
+      (rawEnvironment !== "production"
+        ? "test-transcode-webhook-secret-32-chars-min"
+        : undefined),
+    paymentReconciliationWorkerEnabled: parseBoolean(
+      env,
+      "PAYMENT_RECONCILIATION_WORKER_ENABLED",
+      false,
+    ),
+    paymentReconciliationPollIntervalMs: parseInteger(
+      env,
+      "PAYMENT_RECONCILIATION_POLL_INTERVAL_MS",
+      10_000,
+      500,
+      600_000,
+    ),
+    paymentReconciliationBatchSize: parseInteger(
+      env,
+      "PAYMENT_RECONCILIATION_BATCH_SIZE",
+      10,
+      1,
+      100,
+    ),
+    paymentReconciliationStaleThresholdMinutes: parseInteger(
+      env,
+      "PAYMENT_RECONCILIATION_STALE_THRESHOLD_MINUTES",
+      15,
+      1,
+      1440,
+    ),
+    playbackSigningSecret:
+      env.PLAYBACK_SIGNING_SECRET?.trim() ||
+      (rawEnvironment === "production"
+        ? undefined
+        : "dev-playback-signing-secret-minimum-32-chars-long"),
+    playbackSigningKeyId: env.PLAYBACK_SIGNING_KEY_ID?.trim() || "k1",
+    playbackTokenTtlSeconds: parseInteger(
+      env,
+      "PLAYBACK_TOKEN_TTL_SECONDS",
+      900,
+      60,
+      86400,
+    ),
+    customerStreamingEnabled: parseBoolean(
+      env,
+      "CUSTOMER_STREAMING_ENABLED",
+      false,
+    ),
+    mediaStorageProvider,
+    r2AccountId,
+    r2AccessKeyId,
+    r2SecretAccessKey,
+    r2BucketName,
+    r2Endpoint,
   };
 }

@@ -23,6 +23,8 @@
     "db:fixture:check": "pnpm run db:fixture:migrate && pnpm run db:fixture:migrate"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1159.0",
+    "@aws-sdk/s3-request-presigner": "^3.1159.0",
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.3.0",
     "@fastify/helmet": "^13.1.1",

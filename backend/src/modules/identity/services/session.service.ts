@@ -1,7 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { DRIZZLE_DATABASE } from "../../../infrastructure/database/database.tokens.js";
-import type { ApplicationDatabase } from "../../../infrastructure/database/database.module.js";
+import type {
+  ApplicationDatabase,
+  DatabaseClient,
+} from "../../../infrastructure/database/database.module.js";
 import { sessionsTable, type SessionRecord } from "../../../infrastructure/database/schemas/sessions.schema.js";
 import { usersTable, type UserRecord } from "../../../infrastructure/database/schemas/users.schema.js";
 import { generateSecureToken, hashToken } from "../utils/token.utils.js";
@@ -33,13 +36,15 @@ export class SessionService {
     deviceId?: string | null,
     ipAddress?: string | null,
     userAgent?: string | null,
+    tx?: DatabaseClient,
   ): Promise<{ session: SessionRecord; rawToken: string }> {
+    const client = tx ?? this.db;
     const rawToken = generateSecureToken(32);
     const tokenHash = hashToken(rawToken);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + ABSOLUTE_TIMEOUT_MS);
 
-    const [session] = await this.db
+    const [session] = await client
       .insert(sessionsTable)
       .values({
         userId,
@@ -64,6 +69,7 @@ export class SessionService {
       metadata: { deviceId },
       ipAddress,
       userAgent,
+      tx,
     });
 
     return { session, rawToken };
@@ -133,32 +139,36 @@ export class SessionService {
   async rotateSession(
     sessionId: string,
     reason = "privilege_rotation",
+    tx?: DatabaseClient,
   ): Promise<{ session: SessionRecord; rawToken: string }> {
-    const existing = await this.db
+    const client = tx ?? this.db;
+    const existing = await client
       .select()
       .from(sessionsTable)
-      .where(eq(sessionsTable.id, sessionId))
+      .where(and(eq(sessionsTable.id, sessionId), isNull(sessionsTable.revokedAt)))
       .limit(1);
 
     const oldSession = existing[0];
     if (!oldSession) {
-      throw new Error("Session to rotate not found");
+      throw new Error("Session to rotate not found or already revoked");
     }
 
-    await this.revokeSession(sessionId, reason);
+    await this.revokeSession(sessionId, reason, tx);
     return await this.createSession(
       oldSession.userId,
       oldSession.deviceId,
       oldSession.ipAddress,
       oldSession.userAgent,
+      tx,
     );
   }
 
   /**
    * Revokes a single session.
    */
-  async revokeSession(sessionId: string, reason: string): Promise<void> {
-    const [revoked] = await this.db
+  async revokeSession(sessionId: string, reason: string, tx?: DatabaseClient): Promise<void> {
+    const client = tx ?? this.db;
+    const [revoked] = await client
       .update(sessionsTable)
       .set({
         revokedAt: new Date(),
@@ -174,8 +184,43 @@ export class SessionService {
         resourceType: "session",
         resourceId: sessionId,
         metadata: { reason },
+        tx,
       });
     }
+  }
+
+  /**
+   * Revokes all active sessions for a user EXCEPT the specified session ID (e.g. on password change).
+   */
+  async revokeOtherUserSessions(
+    userId: string,
+    keepSessionId: string,
+    reason: string,
+    tx?: DatabaseClient,
+  ): Promise<void> {
+    const client = tx ?? this.db;
+    await client
+      .update(sessionsTable)
+      .set({
+        revokedAt: new Date(),
+        revokedReason: reason,
+      })
+      .where(
+        and(
+          eq(sessionsTable.userId, userId),
+          ne(sessionsTable.id, keepSessionId),
+          isNull(sessionsTable.revokedAt),
+        ),
+      );
+
+    await this.audit.recordEvent({
+      actorId: userId,
+      action: "session.revoke_others",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { reason, keepSessionId },
+      tx,
+    });
   }
 
   /**

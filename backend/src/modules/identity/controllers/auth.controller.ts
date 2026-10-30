@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -24,6 +25,7 @@ import {
   RequestPasswordResetDto,
   ResetPasswordDto,
   LinkGoogleDto,
+  ChangePasswordDto,
 } from "../dto/index.js";
 import {
   Public,
@@ -152,6 +154,47 @@ export class AuthController {
     reply.clearCookie(COOKIE_NAME, { path: "/" });
     return {
       message: "Password has been successfully reset. Please log in with your new password.",
+    };
+  }
+
+  @Post("change-password")
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() user: SafeUser,
+    @CurrentSession() session: SessionRecord,
+    @Body() dto: ChangePasswordDto,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ message: string }> {
+    const origin = request.headers.origin;
+    if (typeof origin === "string" && origin.length > 0) {
+      if (!this.config.corsOrigins.includes(origin)) {
+        throw new ForbiddenException("Invalid request origin");
+      }
+    }
+
+    const ipAddress = request.ip;
+    const userAgent = request.headers["user-agent"] ?? null;
+
+    const { rawToken } = await this.authService.changePassword(
+      user.id,
+      session.id,
+      dto.currentPassword,
+      dto.newPassword,
+      ipAddress,
+      userAgent,
+    );
+
+    reply.setCookie(COOKIE_NAME, rawToken, {
+      path: "/",
+      httpOnly: true,
+      secure: this.config.appEnvironment === "production",
+      sameSite: "lax",
+      maxAge: COOKIE_MAX_AGE_SECONDS,
+    });
+
+    return {
+      message: "Password has been successfully changed",
     };
   }
 

@@ -287,3 +287,111 @@ export class ConcurrentAttemptConflictException extends HttpException {
     );
   }
 }
+
+export class FulfillmentNotFoundException extends HttpException {
+  constructor(message = "The requested fulfillment was not found.") {
+    super(
+      {
+        code: "FULFILLMENT_NOT_FOUND",
+        message,
+      },
+      HttpStatus.NOT_FOUND,
+    );
+  }
+}
+
+export class FulfillmentTerminalException extends HttpException {
+  constructor(message = "Fulfillment encountered an unrecoverable terminal error.") {
+    super(
+      {
+        code: "FULFILLMENT_TERMINAL_ERROR",
+        message,
+      },
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class FulfillmentRetryableException extends HttpException {
+  constructor(message = "Fulfillment encountered a retryable error.") {
+    super(
+      {
+        code: "FULFILLMENT_RETRYABLE_ERROR",
+        message,
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
+  }
+}
+
+export class RevokedTargetException extends HttpException {
+  constructor(message = "The targeted content entitlement has been revoked and cannot be purchased or reactivated.") {
+    super(
+      {
+        code: "REVOKED_TARGET",
+        message,
+      },
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class OrderNotSettledException extends HttpException {
+  constructor(message = "Order is paid but authoritative matching settlement is missing or mismatched.") {
+    super(
+      {
+        code: "ORDER_NOT_SETTLED",
+        message,
+      },
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class EntitlementConsistencyException extends HttpException {
+  constructor(message = "Authoritative entitlement consistency check failed.") {
+    super(
+      {
+        code: "ENTITLEMENT_CONSISTENCY_ERROR",
+        message,
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+}
+
+export class FulfillmentIntegrityException extends HttpException {
+  constructor(message = "Completed fulfillment lacks valid effect ledger provenance or consistent entitlement state.") {
+    super(
+      {
+        code: "COMPLETED_FULFILLMENT_WITHOUT_VALID_EFFECT",
+        message,
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+}
+
+export class AmbiguousCommitException extends HttpException {
+  constructor(message = "Fulfillment transaction outcome is ambiguous; state preserved without failure mutations.") {
+    super(
+      {
+        code: "AMBIGUOUS_COMMIT_UNRESOLVED",
+        message,
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
+  }
+}
+
+export class RecoveryStateUnresolvedException extends HttpException {
+  constructor(message = "Fulfillment recovery could not establish authoritative database state; state preserved.") {
+    super(
+      {
+        code: "RECOVERY_STATE_UNRESOLVED",
+        message,
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
+  }
+}

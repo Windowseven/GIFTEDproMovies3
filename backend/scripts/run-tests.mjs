@@ -19,11 +19,21 @@ const databaseTestFiles = new Set([
   "catalog-stage4-adversarial.test.js",
   "commercial-runtime.test.js",
   "database.integration.test.js",
+  "fulfillments-runtime.test.js",
   "google-auth-http.integration.test.js",
   "orders-concurrency.test.js",
   "orders-runtime.test.js",
   "payments-runtime.test.js",
   "reconciliation-runtime.test.js",
+  "commercial-access-runtime.test.js",
+  "phase5-commerce-to-streaming.integration.test.js",
+  "password-change.integration.test.js",
+  "customer-catalog.integration.test.js",
+  "orders-history.integration.test.js",
+  "staff-media-preview.integration.test.js",
+  "admin-audit.integration.test.js",
+  "media-supersession-safeguards.test.js",
+  "download-authorization.integration.test.js",
 ]);
 
 

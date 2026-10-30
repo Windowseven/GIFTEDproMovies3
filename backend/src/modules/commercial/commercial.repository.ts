@@ -1,12 +1,17 @@
 import { Injectable } from "@nestjs/common";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { DatabaseClient } from "../../infrastructure/database/database.module.js";
 export type { DatabaseClient };
 import {
   accessPlansTable,
+  catalogGrantRevocationsTable,
+  catalogGrantsTable,
   commercialPolicySnapshotCategoriesTable,
   commercialPolicySnapshotContentsTable,
   commercialPolicySnapshotsTable,
+  entitlementOrderEffectsTable,
+  entitlementsTable,
+  fulfillmentsTable,
   offerCatalogPolicyCategoryMembersTable,
   offerCatalogPolicyContentMembersTable,
   offersTable,
@@ -22,9 +27,19 @@ import { seasonsTable } from "../../infrastructure/database/schemas/seasons.sche
 import { episodesTable } from "../../infrastructure/database/schemas/episodes.schema.js";
 import type {
   AccessPlanRecord,
+  CatalogGrantRecord,
+  CatalogGrantRevocationRecord,
   CommercialPolicySnapshotRecord,
+  EntitlementOrderEffectRecord,
+  EntitlementRecord,
+  FulfillmentRecord,
   NewAccessPlanRecord,
+  NewCatalogGrantRecord,
+  NewCatalogGrantRevocationRecord,
   NewCommercialPolicySnapshotRecord,
+  NewEntitlementOrderEffectRecord,
+  NewEntitlementRecord,
+  NewFulfillmentRecord,
   NewOfferRecord,
   NewOrderRecord,
   NewPaymentAttemptRecord,
@@ -36,6 +51,7 @@ import type {
   PlanVersionRecord,
   SettlementRecord,
 } from "../../infrastructure/database/schemas/commercial.schema.js";
+
 
 @Injectable()
 export class CommercialRepository {
@@ -444,6 +460,22 @@ export class CommercialRepository {
     return row ?? null;
   }
 
+  async findStaleUnresolvedPaymentAttempts(
+    client: DatabaseClient,
+    olderThanMinutes: number,
+    limit: number,
+  ): Promise<PaymentAttemptRecord[]> {
+    const thresholdDate = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+    return await client
+      .select()
+      .from(paymentAttemptsTable)
+      .where(
+        sql`${paymentAttemptsTable.status} IN ('PENDING', 'UNKNOWN') AND ${paymentAttemptsTable.providerReference} IS NOT NULL AND ${paymentAttemptsTable.createdAt} <= ${thresholdDate}`,
+      )
+      .orderBy(asc(paymentAttemptsTable.createdAt))
+      .limit(limit);
+  }
+
   async findSettlementByProviderEvent(
     client: DatabaseClient,
     providerName: string,
@@ -497,5 +529,202 @@ export class CommercialRepository {
 
     return row!;
   }
+
+  async findFulfillmentById(client: DatabaseClient, id: string): Promise<FulfillmentRecord | null> {
+    const [row] = await client
+      .select()
+      .from(fulfillmentsTable)
+      .where(eq(fulfillmentsTable.id, id))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findFulfillmentByOrderId(client: DatabaseClient, orderId: string): Promise<FulfillmentRecord | null> {
+    const [row] = await client
+      .select()
+      .from(fulfillmentsTable)
+      .where(eq(fulfillmentsTable.orderId, orderId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async insertFulfillment(
+    client: DatabaseClient,
+    values: NewFulfillmentRecord,
+  ): Promise<FulfillmentRecord | null> {
+    const [row] = await client
+      .insert(fulfillmentsTable)
+      .values(values)
+      .onConflictDoNothing({ target: fulfillmentsTable.orderId })
+      .returning();
+
+    return row ?? null;
+  }
+
+  async updateFulfillment(
+    client: DatabaseClient,
+    id: string,
+    values: Partial<NewFulfillmentRecord>,
+  ): Promise<FulfillmentRecord | null> {
+    const [row] = await client
+      .update(fulfillmentsTable)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(fulfillmentsTable.id, id))
+      .returning();
+
+    return row ?? null;
+  }
+
+  async findEntitlementById(client: DatabaseClient, id: string): Promise<EntitlementRecord | null> {
+    const [row] = await client
+      .select()
+      .from(entitlementsTable)
+      .where(eq(entitlementsTable.id, id))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async findExactTargetEntitlement(
+    client: DatabaseClient,
+    customerId: string,
+    targetKind: "MOVIE" | "SERIES" | "SEASON" | "EPISODE",
+    targets: {
+      movieContentId?: string | null;
+      seriesContentId?: string | null;
+      seasonId?: string | null;
+      episodeId?: string | null;
+    },
+  ): Promise<EntitlementRecord | null> {
+    const conditions = [
+      eq(entitlementsTable.customerId, customerId),
+      eq(entitlementsTable.targetKind, targetKind),
+    ];
+
+    if (targetKind === "MOVIE" && targets.movieContentId) {
+      conditions.push(eq(entitlementsTable.targetMovieContentId, targets.movieContentId));
+    } else if (targetKind === "SERIES" && targets.seriesContentId) {
+      conditions.push(eq(entitlementsTable.targetSeriesContentId, targets.seriesContentId));
+    } else if (targetKind === "SEASON" && targets.seasonId) {
+      conditions.push(eq(entitlementsTable.targetSeasonId, targets.seasonId));
+    } else if (targetKind === "EPISODE" && targets.episodeId) {
+      conditions.push(eq(entitlementsTable.targetEpisodeId, targets.episodeId));
+    } else {
+      return null;
+    }
+
+    const [row] = await client
+      .select()
+      .from(entitlementsTable)
+      .where(and(...conditions))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async insertEntitlement(
+    client: DatabaseClient,
+    values: NewEntitlementRecord,
+  ): Promise<EntitlementRecord | null> {
+    const [row] = await client
+      .insert(entitlementsTable)
+      .values(values)
+      .onConflictDoNothing()
+      .returning();
+
+    return row ?? null;
+  }
+
+  async updateEntitlement(
+    client: DatabaseClient,
+    id: string,
+    values: Partial<NewEntitlementRecord>,
+  ): Promise<EntitlementRecord> {
+    const [row] = await client
+      .update(entitlementsTable)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(entitlementsTable.id, id))
+      .returning();
+
+    return row!;
+  }
+
+  async findEntitlementOrderEffectByOrderId(
+    client: DatabaseClient,
+    orderId: string,
+  ): Promise<EntitlementOrderEffectRecord | null> {
+    const [row] = await client
+      .select()
+      .from(entitlementOrderEffectsTable)
+      .where(eq(entitlementOrderEffectsTable.orderId, orderId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async insertEntitlementOrderEffect(
+    client: DatabaseClient,
+    values: NewEntitlementOrderEffectRecord,
+  ): Promise<EntitlementOrderEffectRecord> {
+    const [row] = await client
+      .insert(entitlementOrderEffectsTable)
+      .values(values)
+      .returning();
+
+    return row!;
+  }
+
+  async findCatalogGrantByOrderId(
+    client: DatabaseClient,
+    orderId: string,
+  ): Promise<CatalogGrantRecord | null> {
+    const [row] = await client
+      .select()
+      .from(catalogGrantsTable)
+      .where(eq(catalogGrantsTable.orderId, orderId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async insertCatalogGrant(
+    client: DatabaseClient,
+    values: NewCatalogGrantRecord,
+  ): Promise<CatalogGrantRecord> {
+    const [row] = await client
+      .insert(catalogGrantsTable)
+      .values(values)
+      .returning();
+
+    return row!;
+  }
+
+  async findCatalogGrantRevocationByOrderId(
+    client: DatabaseClient,
+    orderId: string,
+  ): Promise<CatalogGrantRevocationRecord | null> {
+    const [row] = await client
+      .select()
+      .from(catalogGrantRevocationsTable)
+      .where(eq(catalogGrantRevocationsTable.orderId, orderId))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async insertCatalogGrantRevocation(
+    client: DatabaseClient,
+    values: NewCatalogGrantRevocationRecord,
+  ): Promise<CatalogGrantRevocationRecord> {
+    const [row] = await client
+      .insert(catalogGrantRevocationsTable)
+      .values(values)
+      .returning();
+
+    return row!;
+  }
 }
+
 

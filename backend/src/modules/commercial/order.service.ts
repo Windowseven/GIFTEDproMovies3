@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 import { DRIZZLE_DATABASE } from "../../infrastructure/database/database.tokens.js";
 import type { ApplicationDatabase } from "../../infrastructure/database/database.module.js";
@@ -9,12 +9,18 @@ import {
 import { AuditService } from "../audit/audit.service.js";
 import type { CreateOrderDto } from "./dto/create-order.dto.js";
 import {
+  ListOrdersQueryDto,
+  type OrderStatus,
+} from "./dto/list-orders-query.dto.js";
+import {
   OfferNotFoundException,
   OfferNotPurchasableException,
   OrderIdempotencyConflictException,
   OrderNotFoundException,
 } from "./commercial.errors.js";
 import { CommercialRepository } from "./commercial.repository.js";
+import { EventBusService } from "../../infrastructure/events/event-bus.service.js";
+import { OrderCreatedEvent } from "../../infrastructure/events/commercial.events.js";
 
 @Injectable()
 export class OrderService {
@@ -23,6 +29,7 @@ export class OrderService {
     private readonly db: ApplicationDatabase,
     private readonly repository: CommercialRepository,
     private readonly audit: AuditService,
+    private readonly eventBus?: EventBusService,
   ) {}
 
   async createOrder(
@@ -51,7 +58,7 @@ export class OrderService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await this.db.transaction(
+        const createdOrder = await this.db.transaction(
           async (tx) => {
             // Double-check inside transaction before inserting
             const existingInTx = await this.repository.findOrderByCustomerAndIdempotencyKey(
@@ -173,6 +180,18 @@ export class OrderService {
           },
           { isolationLevel: "repeatable read" },
         );
+
+        this.eventBus?.publish(
+          new OrderCreatedEvent({
+            orderId: createdOrder.id,
+            customerId: createdOrder.customerId,
+            offerId: createdOrder.offerId,
+            amountTzs: createdOrder.amountTzs,
+            createdAt: createdOrder.createdAt,
+          }),
+        );
+
+        return createdOrder;
       } catch (error: unknown) {
         lastError = error;
 
@@ -249,5 +268,243 @@ export class OrderService {
       throw new OrderNotFoundException();
     }
     return order;
+  }
+
+  async getCustomerOrders(
+    customerId: string,
+    query: ListOrdersQueryDto,
+  ): Promise<PaginatedOrdersResponse> {
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 100);
+    const decodedCursor = query.cursor ? decodeOrderCursor(query.cursor) : null;
+
+    const whereConditions = [sql`o.customer_id = ${customerId}::uuid`];
+
+    if (decodedCursor) {
+      const iso = decodedCursor.createdAt.toISOString();
+      whereConditions.push(
+        sql`(o.created_at < ${iso}::timestamptz OR (o.created_at = ${iso}::timestamptz AND o.id < ${decodedCursor.id}::uuid))`,
+      );
+    }
+
+    if (query.status) {
+      whereConditions.push(sql`o.status = ${query.status}::order_status`);
+    }
+
+    const whereClause = sql.join(whereConditions, sql` AND `);
+
+    interface CustomerOrderRowDb extends Record<string, unknown> {
+      id: string;
+      customer_id: string;
+      offer_id: string;
+      status: OrderStatus;
+      target_kind: string;
+      target_movie_content_id: string | null;
+      target_series_content_id: string | null;
+      target_season_id: string | null;
+      target_episode_id: string | null;
+      plan_version_id: string;
+      amount_tzs: number;
+      duration_value: number;
+      duration_unit: string;
+      created_at: string;
+      updated_at: string;
+    }
+
+    const rowsResult = await this.db.execute<CustomerOrderRowDb>(
+      sql`
+        SELECT
+          o.id,
+          o.customer_id,
+          o.offer_id,
+          o.status,
+          o.target_kind,
+          o.target_movie_content_id,
+          o.target_series_content_id,
+          o.target_season_id,
+          o.target_episode_id,
+          o.plan_version_id,
+          o.amount_tzs,
+          o.duration_value,
+          o.duration_unit,
+          o.catalog_policy_snapshot_id,
+          o.idempotency_key,
+          o.created_at,
+          o.updated_at
+        FROM orders o
+        WHERE ${whereClause}
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT ${limit + 1}
+      `,
+    );
+
+    const rawRows = rowsResult.rows ?? [];
+
+    const hasMore = rawRows.length > limit;
+    const itemsRows = hasMore ? rawRows.slice(0, limit) : rawRows;
+
+    if (itemsRows.length === 0) {
+      return { items: [], nextCursor: null };
+    }
+
+    const orderIds = itemsRows.map((r) => r.id);
+    const orderIdSqlList = sql.join(
+      orderIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    );
+
+    const [paymentAttemptsRes, fulfillmentsRes] = await Promise.all([
+      this.db.execute<{
+        order_id: string;
+        status: string;
+        provider_name: string;
+        amount_tzs: number;
+      } & Record<string, unknown>>(
+        sql`
+          SELECT DISTINCT ON (order_id)
+            order_id, status, provider_name, amount_tzs
+          FROM payment_attempts
+          WHERE order_id IN (${orderIdSqlList})
+          ORDER BY order_id, attempt_number DESC
+        `,
+      ),
+      this.db.execute<{
+        order_id: string;
+        status: string;
+        completed_at: string | null;
+      } & Record<string, unknown>>(
+        sql`
+          SELECT order_id, status, completed_at
+          FROM fulfillments
+          WHERE order_id IN (${orderIdSqlList})
+        `,
+      ),
+    ]);
+
+    const paRows = paymentAttemptsRes.rows ?? [];
+    const paByOrder = new Map(paRows.map((p) => [p.order_id, p]));
+
+    const fRows = fulfillmentsRes.rows ?? [];
+    const fByOrder = new Map(fRows.map((f) => [f.order_id, f]));
+
+    const items: CustomerOrderSummary[] = itemsRows.map((row) => {
+      const pa = paByOrder.get(row.id);
+      const f = fByOrder.get(row.id);
+
+      return {
+        id: row.id,
+        offerId: row.offer_id,
+        status: row.status,
+        targetKind: row.target_kind,
+        targetMovieContentId: row.target_movie_content_id,
+        targetSeriesContentId: row.target_series_content_id,
+        targetSeasonId: row.target_season_id,
+        targetEpisodeId: row.target_episode_id,
+        planVersionId: row.plan_version_id,
+        amountTzs: row.amount_tzs,
+        durationValue: row.duration_value,
+        durationUnit: row.duration_unit,
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString(),
+        paymentAttempt: pa
+          ? {
+              status: pa.status,
+              providerName: pa.provider_name,
+              amountTzs: pa.amount_tzs,
+            }
+          : null,
+        fulfillment: f
+          ? {
+              status: f.status,
+              completedAt: f.completed_at
+                ? new Date(f.completed_at).toISOString()
+                : null,
+            }
+          : null,
+      };
+    });
+
+    const lastItem = itemsRows[itemsRows.length - 1];
+    const nextCursor = hasMore
+      ? encodeOrderCursor(lastItem.created_at, lastItem.id)
+      : null;
+
+    return { items, nextCursor };
+  }
+}
+
+export interface CustomerOrderSummary {
+  id: string;
+  offerId: string;
+  status: OrderStatus;
+  targetKind: string;
+  targetMovieContentId: string | null;
+  targetSeriesContentId: string | null;
+  targetSeasonId: string | null;
+  targetEpisodeId: string | null;
+  planVersionId: string;
+  amountTzs: number;
+  durationValue: number;
+  durationUnit: string;
+  createdAt: string;
+  updatedAt: string;
+  paymentAttempt?: {
+    status: string;
+    providerName: string;
+    amountTzs: number;
+  } | null;
+  fulfillment?: {
+    status: string;
+    completedAt: string | null;
+  } | null;
+}
+
+export interface PaginatedOrdersResponse {
+  items: CustomerOrderSummary[];
+  nextCursor: string | null;
+}
+
+interface DecodedOrderCursor {
+  createdAt: Date;
+  id: string;
+}
+
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function encodeOrderCursor(createdAt: Date | string, id: string): string {
+  const iso =
+    typeof createdAt === "string"
+      ? new Date(createdAt).toISOString()
+      : createdAt.toISOString();
+  return Buffer.from(JSON.stringify({ createdAt: iso, id })).toString(
+    "base64url",
+  );
+}
+
+function decodeOrderCursor(cursor: string): DecodedOrderCursor {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf-8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("Invalid cursor format");
+    }
+    if (
+      typeof parsed.createdAt !== "string" ||
+      isNaN(Date.parse(parsed.createdAt))
+    ) {
+      throw new Error("Invalid createdAt in cursor");
+    }
+    if (typeof parsed.id !== "string" || !UUID_V4_REGEX.test(parsed.id)) {
+      throw new Error("Invalid id in cursor");
+    }
+    return {
+      createdAt: new Date(parsed.createdAt),
+      id: parsed.id.toLowerCase(),
+    };
+  } catch {
+    throw new BadRequestException({
+      code: "INVALID_CURSOR",
+      message: "The provided pagination cursor is invalid or malformed.",
+    });
   }
 }

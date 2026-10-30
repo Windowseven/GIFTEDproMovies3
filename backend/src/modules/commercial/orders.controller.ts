@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -16,7 +17,11 @@ import { SessionAuthGuard } from "../identity/guards/session-auth.guard.js";
 import { RolesGuard } from "../identity/guards/roles.guard.js";
 import type { OrderRecord } from "../../infrastructure/database/schemas/commercial.schema.js";
 import { CreateOrderDto } from "./dto/create-order.dto.js";
-import { OrderService } from "./order.service.js";
+import { ListOrdersQueryDto } from "./dto/list-orders-query.dto.js";
+import {
+  OrderService,
+  type PaginatedOrdersResponse,
+} from "./order.service.js";
 
 @Controller("orders")
 @UseGuards(SessionAuthGuard, RolesGuard)
@@ -35,6 +40,15 @@ export class OrdersController {
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"] ?? null,
     });
+  }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  async getCustomerOrders(
+    @CurrentUser("id") customerId: string,
+    @Query() query: ListOrdersQueryDto,
+  ): Promise<PaginatedOrdersResponse> {
+    return await this.orderService.getCustomerOrders(customerId, query);
   }
 
   @Get(":id")

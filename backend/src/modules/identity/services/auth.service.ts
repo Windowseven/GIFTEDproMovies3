@@ -23,7 +23,7 @@ import { SessionService } from "./session.service.js";
 import { DeviceService } from "./device.service.js";
 import { AuditService } from "../../audit/audit.service.js";
 import { generateSecureToken, hashToken } from "../utils/token.utils.js";
-import type { SessionRecord } from "../../../infrastructure/database/schemas/sessions.schema.js";
+import { sessionsTable, type SessionRecord } from "../../../infrastructure/database/schemas/sessions.schema.js";
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -514,6 +514,147 @@ export class AuthService {
       resourceType: "user",
       resourceId: tokenRecord.userId,
       failClosed: true,
+    });
+  }
+
+  /**
+   * Authenticated in-session password change.
+   * Atomically updates password hash, rotates active session, revokes all other sessions,
+   * and records fail-closed audit event in a single PostgreSQL transaction.
+   */
+  async changePassword(
+    userId: string,
+    currentSessionId: string,
+    currentPassword: string,
+    newPassword: string,
+    ipAddress?: string | null,
+    userAgent?: string | null,
+  ): Promise<{ session: SessionRecord; rawToken: string }> {
+    // 1. Fetch user to verify status and current password hash
+    const [user] = await this.db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!user || user.status !== "active") {
+      throw new UnauthorizedException("User account is not active");
+    }
+
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        "Account does not have a password set. Use account recovery or set password flow.",
+      );
+    }
+
+    // 2. Verify current password with Argon2id
+    const isCurrentValid = await this.passwordHasher.verifyPassword(
+      user.passwordHash,
+      currentPassword,
+    );
+
+    if (!isCurrentValid) {
+      try {
+        await this.audit.recordEvent({
+          actorId: userId,
+          action: "auth.password_change.failed",
+          resourceType: "user",
+          resourceId: userId,
+          metadata: { reason: "invalid_current_password" },
+          ipAddress,
+          userAgent,
+          failClosed: false,
+        });
+      } catch {
+        // Logging error must not prevent failure response or leak info
+      }
+      throw new UnauthorizedException("Invalid current password");
+    }
+
+    // 3. Prevent setting identical password
+    if (newPassword === currentPassword) {
+      throw new BadRequestException("New password cannot be identical to current password");
+    }
+
+    // 4. Hash new password outside transaction (prevents holding DB connection during CPU-intensive Argon2id)
+    const newPasswordHash = await this.passwordHasher.hashPassword(newPassword);
+
+    // 5. Execute atomic transaction
+    return await this.executeInTransaction(async (tx) => {
+      // Row lock on user to ensure strict mutual exclusion for concurrent requests
+      const [lockedUser] = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .for("update");
+
+      if (!lockedUser || lockedUser.status !== "active") {
+        throw new UnauthorizedException("User account is not active");
+      }
+
+      // Conditionally verify and rotate session (atomic test-and-set)
+      const [currentSession] = await tx
+        .update(sessionsTable)
+        .set({
+          revokedAt: new Date(),
+          revokedReason: "password_change",
+        })
+        .where(
+          and(
+            eq(sessionsTable.id, currentSessionId),
+            isNull(sessionsTable.revokedAt),
+          ),
+        )
+        .returning();
+
+      if (!currentSession) {
+        throw new UnauthorizedException("Session has already been revoked or rotated");
+      }
+
+      // Update password hash
+      const now = new Date();
+      await tx
+        .update(usersTable)
+        .set({
+          passwordHash: newPasswordHash,
+          updatedAt: now,
+        })
+        .where(eq(usersTable.id, userId));
+
+      // Create new rotated session
+      const { session: newSession, rawToken } = await this.sessionService.createSession(
+        userId,
+        currentSession.deviceId,
+        ipAddress,
+        userAgent,
+        tx,
+      );
+
+      // Revoke all other active sessions for this user
+      await this.sessionService.revokeOtherUserSessions(
+        userId,
+        newSession.id,
+        "password_change",
+        tx,
+      );
+
+      // Fail-closed success audit event in the same transaction
+      await this.audit.recordEvent({
+        actorId: userId,
+        action: "auth.password_change.completed",
+        resourceType: "user",
+        resourceId: userId,
+        metadata: {
+          previousSessionId: currentSession.id,
+          newSessionId: newSession.id,
+        },
+        ipAddress,
+        userAgent,
+        tx,
+        failClosed: true,
+      });
+
+      return { session: newSession, rawToken };
     });
   }
 

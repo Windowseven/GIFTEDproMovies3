@@ -20,6 +20,7 @@ import {
 import { CommercialRepository } from "./commercial.repository.js";
 import { PaymentService } from "./payment.service.js";
 import { AuditService } from "../audit/audit.service.js";
+import { FulfillmentService } from "./fulfillment.service.js";
 import {
   DuplicateEventConflictException,
   InvalidPaymentAttemptTransitionException,
@@ -77,6 +78,7 @@ export class ReconciliationService {
     private readonly commercialRepository: CommercialRepository,
     private readonly paymentService: PaymentService,
     private readonly auditService: AuditService,
+    private readonly fulfillmentService: FulfillmentService,
   ) {}
 
 
@@ -489,6 +491,9 @@ LIMIT $7;
                 );
               }
 
+              // Ensure fulfillment row exists idempotently
+              await this.fulfillmentService.enqueueFulfillment(tx, order.id);
+
               // Idempotent repair with existing matching settlement:
               // ZERO audit events emitted, ZERO database mutations.
               return { settlement: existingSettlement, idempotentRepair: true };
@@ -536,6 +541,8 @@ LIMIT $7;
               tx,
               failClosed: true,
             });
+
+            await this.fulfillmentService.enqueueFulfillment(tx, order.id);
 
             return { settlement, idempotentRepair: false };
           },

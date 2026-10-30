@@ -85,6 +85,20 @@
       "when": 1791200000011,
       "tag": "0011_phase4_trigger_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791200000012,
+      "tag": "0012_phase4_catalog_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791200000013,
+      "tag": "0013_phase6_7_supersession_and_downloads",
+      "breakpoints": true
     }
   ]
 }

@@ -75,20 +75,28 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const statusDetails = STATUS_DETAILS[statusCode];
 
     const code =
-      statusCode >= 500
-        ? "INTERNAL_ERROR"
-        : typeof customResponse?.code === "string" && customResponse.code.length > 0
+      statusCode === HttpStatus.SERVICE_UNAVAILABLE
+        ? typeof customResponse?.code === "string" && customResponse.code.length > 0
           ? customResponse.code
-          : statusDetails?.code ?? "REQUEST_REJECTED";
+          : statusDetails?.code ?? "SERVICE_UNAVAILABLE"
+        : statusCode >= 500
+          ? "INTERNAL_ERROR"
+          : typeof customResponse?.code === "string" && customResponse.code.length > 0
+            ? customResponse.code
+            : statusDetails?.code ?? "REQUEST_REJECTED";
 
     const message =
-      statusCode >= 500
-        ? "An unexpected error occurred."
-        : typeof customResponse?.message === "string" && customResponse.message.length > 0
+      statusCode === HttpStatus.SERVICE_UNAVAILABLE
+        ? typeof customResponse?.message === "string" && customResponse.message.length > 0
           ? customResponse.message
-          : statusDetails?.message ?? "The request was rejected.";
+          : statusDetails?.message ?? "The service is temporarily unavailable."
+        : statusCode >= 500
+          ? "An unexpected error occurred."
+          : typeof customResponse?.message === "string" && customResponse.message.length > 0
+            ? customResponse.message
+            : statusDetails?.message ?? "The request was rejected.";
 
-    if (statusCode >= 500) {
+    if (statusCode >= 500 && statusCode !== HttpStatus.SERVICE_UNAVAILABLE) {
       this.logger.error(
         {
           requestId: request.id,

@@ -1,18 +1,21 @@
-import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import { sql } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { Inject, Injectable, Optional, UnauthorizedException } from "@nestjs/common";
+import { eq, sql } from "drizzle-orm";
+import { randomBytes, randomUUID } from "node:crypto";
 import { DRIZZLE_DATABASE } from "../../infrastructure/database/database.tokens.js";
 import type { ApplicationDatabase } from "../../infrastructure/database/database.module.js";
 import {
   ordersTable,
   paymentAttemptsTable,
+  settlementsTable,
   type OrderRecord,
   type PaymentAttemptRecord,
   type SettlementRecord,
 } from "../../infrastructure/database/schemas/commercial.schema.js";
+import { usersTable } from "../../infrastructure/database/schemas/users.schema.js";
 
 import { CommercialRepository, type DatabaseClient } from "./commercial.repository.js";
 import { AuditService } from "../audit/audit.service.js";
+import { FulfillmentService } from "./fulfillment.service.js";
 import {
   ActivePaymentAttemptExistsException,
   ConcurrentAttemptConflictException,
@@ -29,6 +32,16 @@ import {
 } from "./commercial.errors.js";
 import type { CreatePaymentAttemptDto } from "./dto/create-payment-attempt.dto.js";
 import type { SimulateConfirmPaymentDto } from "./dto/simulate-confirm-payment.dto.js";
+import type { InitiateCheckoutDto, InitiateCheckoutResult } from "./dto/initiate-checkout.dto.js";
+import type { ClickPesaWebhookDto } from "./dto/clickpesa-webhook.dto.js";
+import type { PalmPesaWebhookDto } from "./dto/palmpesa-webhook.dto.js";
+import { PAYMENT_GATEWAY_PORT } from "./commercial.tokens.js";
+import type { PaymentGatewayPort } from "./ports/payment-gateway.port.js";
+import { SimulatedClickPesaAdapter } from "./adapters/simulated-clickpesa.adapter.js";
+import { ENVIRONMENT_CONFIG } from "../../config/tokens.js";
+import { loadEnvironment, type EnvironmentConfig } from "../../config/environment.js";
+import { verifyClickPesaChecksum } from "./adapters/clickpesa-checksum.validator.js";
+import { verifyPalmPesaSignature } from "./adapters/palmpesa-signature.validator.js";
 
 export interface SimulateConfirmPaymentResult {
   attempt: PaymentAttemptRecord;
@@ -45,6 +58,13 @@ export class PaymentService {
     private readonly db: ApplicationDatabase,
     private readonly repository: CommercialRepository,
     private readonly auditService: AuditService,
+    private readonly fulfillmentService: FulfillmentService,
+    @Optional()
+    @Inject(PAYMENT_GATEWAY_PORT)
+    private readonly paymentGateway: PaymentGatewayPort = new SimulatedClickPesaAdapter(),
+    @Optional()
+    @Inject(ENVIRONMENT_CONFIG)
+    private readonly environment: EnvironmentConfig = loadEnvironment(process.env),
   ) {}
 
   async createPaymentAttempt(
@@ -512,6 +532,8 @@ export class PaymentService {
                   );
                 }
 
+                await this.fulfillmentService.enqueueFulfillment(tx, order.id);
+
                 // Return existing settlement: ZERO audit events emitted, ZERO database mutations.
                 return {
                   attempt,
@@ -556,6 +578,8 @@ export class PaymentService {
                 tx,
                 failClosed: true,
               });
+
+              await this.fulfillmentService.enqueueFulfillment(tx, order.id);
 
               return {
                 attempt,
@@ -693,6 +717,8 @@ export class PaymentService {
               tx,
               failClosed: true,
             });
+
+            await this.fulfillmentService.enqueueFulfillment(tx, updatedOrder.id);
 
             return {
               attempt: updatedAttempt,
@@ -910,5 +936,1065 @@ export class PaymentService {
     throw lastError;
   }
 
+  async initiateCheckout(
+    customerId: string,
+    orderId: string,
+    dto: InitiateCheckoutDto,
+    context?: { ipAddress?: string | null; userAgent?: string | null },
+  ): Promise<InitiateCheckoutResult> {
+    const maxAttempts = 3;
+    let lastError: unknown;
+
+    for (let loop = 1; loop <= maxAttempts; loop++) {
+      try {
+        const { attempt, order, orderReference, customerName, customerEmail } =
+          await this.db.transaction(
+            async (tx) => {
+              // 1. Lock and read target order with exclusive lock for checkout attempt creation
+              const [order] = await tx
+              .select()
+              .from(ordersTable)
+              .where(sql`${ordersTable.id} = ${orderId}`)
+              .for("update");
+
+            if (!order || order.customerId !== customerId) {
+              // Anti-IDOR: identical 404 regardless of whether order belongs to another customer
+              throw new OrderNotFoundException();
+            }
+
+            if (order.status === "PAID") {
+              throw new OrderAlreadyPaidException("This order has already been paid.");
+            }
+
+            if (order.status !== "PENDING_PAYMENT") {
+              throw new OrderNotPayableException(
+                `Order status is "${order.status}"; payment cannot be initiated.`,
+              );
+            }
+
+            // 2. Check for active unresolved attempt (PENDING or UNKNOWN)
+            const existingUnresolved = await this.repository.findActiveUnresolvedAttemptForOrder(
+              tx,
+              orderId,
+            );
+
+            if (existingUnresolved) {
+              const now = Date.now();
+              const attemptAgeMs = now - existingUnresolved.createdAt.getTime();
+              const isOlderThan15m = attemptAgeMs > 15 * 60 * 1000;
+
+              if (dto.forceNew || isOlderThan15m) {
+                // Supersede / Expire previous attempt to release partial unique index
+                const supersededStatus = isOlderThan15m ? "EXPIRED" : "CANCELLED";
+                await this.repository.updatePaymentAttemptStatus(
+                  tx,
+                  existingUnresolved.id,
+                  supersededStatus,
+                );
+
+                await this.auditService.recordEvent({
+                  action: "PAYMENT_ATTEMPT_CANCEL",
+                  resourceType: "payment_attempt",
+                  resourceId: existingUnresolved.id,
+                  actorId: customerId,
+                  metadata: {
+                    orderId: order.id,
+                    priorStatus: existingUnresolved.status,
+                    newStatus: supersededStatus,
+                    reason: isOlderThan15m ? "TIMEOUT_EXPIRED" : "SUPERSEDED_BY_CUSTOMER",
+                  },
+                  tx,
+                  failClosed: true,
+                });
+              } else {
+                throw new ActivePaymentAttemptExistsException(
+                  `An unresolved payment attempt (${existingUnresolved.providerReference ?? existingUnresolved.id}) is already active. Complete checkout or specify forceNew: true to initiate a new attempt.`,
+                );
+              }
+            }
+
+            // 3. Compute attempt sequence & generate provider reference
+            const maxAttempt = await this.repository.getMaxAttemptNumberForOrder(tx, orderId);
+            const attemptNumber = maxAttempt + 1;
+
+            const providerName = this.paymentGateway.providerName;
+            const prefix = providerName === "palmpesa" ? "PP" : "CP";
+            const cleanOrderId = order.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase();
+            const seq = String(attemptNumber).padStart(2, "0");
+            const salt = randomBytes(3).toString("hex").toUpperCase();
+            const orderReference = `${prefix}${cleanOrderId}${seq}${salt}`;
+
+            // Fetch customer email from database if not supplied in DTO
+            const [customerUser] = await tx
+              .select({ email: usersTable.email })
+              .from(usersTable)
+              .where(eq(usersTable.id, customerId))
+              .limit(1);
+
+            const customerName = dto.customerName || "GIFTEDpro Customer";
+            const customerEmail = dto.customerEmail || customerUser?.email || "customer@giftedpro.local";
+
+            // 4. Insert payment attempt in PENDING state
+            const attempt = await this.repository.insertPaymentAttempt(tx, {
+              orderId: order.id,
+              attemptNumber,
+              providerName,
+              providerReference: orderReference,
+              status: "PENDING",
+              amountTzs: order.amountTzs,
+            });
+
+            await this.auditService.recordEvent({
+              action: "PAYMENT_ATTEMPT_CREATE",
+              resourceType: "payment_attempt",
+              resourceId: attempt.id,
+              actorId: customerId,
+              metadata: {
+                orderId: order.id,
+                attemptNumber,
+                amountTzs: order.amountTzs,
+                providerName,
+                providerReference: orderReference,
+                ipAddress: context?.ipAddress,
+                userAgent: context?.userAgent,
+              },
+              tx,
+              failClosed: true,
+            });
+
+            return { attempt, order, orderReference, customerName, customerEmail };
+          },
+          { isolationLevel: "repeatable read" },
+        );
+
+        // 5. Call external gateway port
+        try {
+          const checkoutResult = await this.paymentGateway.initiateCheckout({
+            orderId: order.id,
+            attemptId: attempt.id,
+            orderReference,
+            amountTzs: order.amountTzs,
+            currency: "TZS",
+            customerPhone: dto.phoneNumber,
+            customerName,
+            customerEmail,
+            returnUrl: dto.returnUrl,
+            cancelUrl: dto.cancelUrl,
+          });
+
+          if (checkoutResult.providerOrderId) {
+            await this.repository.updatePaymentAttemptStatus(
+              this.db,
+              attempt.id,
+              "PENDING",
+              checkoutResult.providerOrderId,
+              orderReference,
+            );
+          }
+
+          return {
+            attemptId: attempt.id,
+            attemptNumber: attempt.attemptNumber,
+            orderId: order.id,
+            orderReference,
+            paymentMode: checkoutResult.paymentMode,
+            checkoutUrl: checkoutResult.checkoutUrl,
+            statusUrl: checkoutResult.statusUrl,
+            providerOrderId: checkoutResult.providerOrderId,
+            amountTzs: order.amountTzs,
+            currency: "TZS",
+            status: attempt.status,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          };
+        } catch (gatewayErr: unknown) {
+          // If gateway initiation fails, mark attempt as FAILED to release partial index
+          await this.repository.updatePaymentAttemptStatus(
+            this.db,
+            attempt.id,
+            "FAILED",
+          );
+          await this.auditService.recordEvent({
+            action: "PAYMENT_ATTEMPT_CONFIRM",
+            resourceType: "payment_attempt",
+            resourceId: attempt.id,
+            actorId: customerId,
+            metadata: {
+              orderId: order.id,
+              outcome: "FAILED",
+              reason: "GATEWAY_INITIATION_FAILURE",
+              error: gatewayErr instanceof Error ? gatewayErr.message : String(gatewayErr),
+            },
+            failClosed: false,
+          });
+          throw gatewayErr;
+        }
+      } catch (error: unknown) {
+        lastError = error;
+
+        if (
+          error instanceof OrderNotFoundException ||
+          error instanceof OrderAlreadyPaidException ||
+          error instanceof OrderNotPayableException ||
+          error instanceof ActivePaymentAttemptExistsException
+        ) {
+          throw error;
+        }
+
+        const err = error as { code?: string; constraint?: string; message?: string } | undefined;
+        const isConflict =
+          err?.code === "23505" ||
+          err?.code === "40001" ||
+          String(err?.message ?? "").includes("could not serialize");
+
+        if (isConflict && loop < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 25 * loop));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  async processClickPesaWebhook(
+    dto: ClickPesaWebhookDto,
+    rawPayload: unknown,
+    signatureHeader?: string,
+  ): Promise<{
+    processed: boolean;
+    status: string;
+    idempotentReplay?: boolean;
+    reason?: string;
+  }> {
+    // 1. Signature / Checksum validation
+    const secret =
+      this.environment.clickPesaWebhookSecret ||
+      (this.environment.appEnvironment !== "production"
+        ? "test-clickpesa-webhook-secret-32-chars-minimum"
+        : undefined);
+
+    if (!secret) {
+      throw new UnauthorizedException("ClickPesa webhook secret is not configured.");
+    }
+
+    const candidateChecksum = signatureHeader || dto.checksum;
+    if (!candidateChecksum) {
+      throw new UnauthorizedException("Missing ClickPesa webhook checksum or signature.");
+    }
+
+    const isValid = verifyClickPesaChecksum(rawPayload, secret, candidateChecksum);
+    if (!isValid) {
+      throw new UnauthorizedException("Invalid ClickPesa webhook signature/checksum.");
+    }
+
+    // 2. Locate payment attempt by provider reference
+    const initialAttempt = await this.repository.findPaymentAttemptByProviderReference(
+      this.db,
+      "clickpesa",
+      dto.orderReference,
+    );
+
+    if (!initialAttempt) {
+      return {
+        processed: false,
+        status: "NOT_FOUND",
+        reason: `Payment attempt with reference ${dto.orderReference} not found`,
+      };
+    }
+
+    const normalizedStatus = dto.status.toUpperCase();
+    const isSuccess = normalizedStatus === "SUCCESS" || normalizedStatus === "SETTLED";
+    const isFailure =
+      normalizedStatus === "FAILED" ||
+      normalizedStatus === "CANCELLED" ||
+      normalizedStatus === "REVERSED" ||
+      normalizedStatus === "REFUNDED";
+
+    if (!isSuccess && !isFailure) {
+      return {
+        processed: true,
+        status: normalizedStatus,
+        reason: "In-progress status acknowledged without mutation",
+      };
+    }
+
+    // 3. Process status update with strict transaction locks
+    const maxAttempts = 3;
+    let lastError: unknown;
+
+    for (let loop = 1; loop <= maxAttempts; loop++) {
+      try {
+        return await this.db.transaction(
+          async (tx) => {
+            const [attempt] = await tx
+              .select()
+              .from(paymentAttemptsTable)
+              .where(sql`${paymentAttemptsTable.id} = ${initialAttempt.id}`)
+              .for("update");
+
+            if (!attempt) {
+              throw new PaymentAttemptNotFoundException();
+            }
+
+            const [order] = await tx
+              .select()
+              .from(ordersTable)
+              .where(sql`${ordersTable.id} = ${attempt.orderId}`)
+              .for("update");
+
+            if (!order) {
+              throw new OrderNotFoundException();
+            }
+
+            // Financial equality invariant
+            if (dto.amount !== attempt.amountTzs || attempt.amountTzs !== order.amountTzs) {
+              throw new PaymentAmountMismatchException(
+                `Webhook amount (${dto.amount}) does not match attempt amount (${attempt.amountTzs}) or order amount (${order.amountTzs}).`,
+              );
+            }
+
+            const providerEventId =
+              dto.transactionId ||
+              dto.eventId ||
+              `EVT-${dto.orderReference}-${normalizedStatus}`;
+
+            // Handle IDEMPOTENT REPLAY if attempt is already SUCCEEDED
+            if (attempt.status === "SUCCEEDED") {
+              if (!isSuccess) {
+                throw new InvalidPaymentAttemptTransitionException(
+                  "Cannot transition SUCCEEDED payment attempt to non-SUCCEEDED status.",
+                );
+              }
+
+              const existingSettlement = await this.repository.findSettlementByPaymentAttemptId(
+                tx,
+                attempt.id,
+              );
+
+              if (existingSettlement) {
+                await this.fulfillmentService.enqueueFulfillment(tx, order.id);
+                return {
+                  processed: true,
+                  status: "SUCCEEDED",
+                  idempotentReplay: true,
+                };
+              }
+
+              // Backfill settlement if missing
+              await this.ensureSettlementForSucceededAttempt(tx, attempt, order, {
+                providerName: "clickpesa",
+                providerEventId,
+                providerReference: attempt.providerReference!,
+                amountTzs: attempt.amountTzs,
+              });
+
+              await this.auditService.recordEvent({
+                action: "SETTLEMENT_REPLAY_BACKFILL",
+                resourceType: "payment_attempt",
+                resourceId: attempt.id,
+                actorId: order.customerId,
+                metadata: {
+                  orderId: order.id,
+                  providerEventId,
+                  providerReference: attempt.providerReference,
+                  amountTzs: attempt.amountTzs,
+                  executionSource: "CLICKPESA_WEBHOOK",
+                },
+                tx,
+                failClosed: true,
+              });
+
+              await this.fulfillmentService.enqueueFulfillment(tx, order.id);
+              return {
+                processed: true,
+                status: "SUCCEEDED",
+                idempotentReplay: true,
+              };
+            }
+
+            // If incoming event is SUCCESS / SETTLED
+            if (isSuccess) {
+              if (
+                attempt.status === "FAILED" ||
+                attempt.status === "CANCELLED" ||
+                attempt.status === "EXPIRED"
+              ) {
+                throw new InvalidPaymentAttemptTransitionException(
+                  `Payment attempt is in terminal status "${attempt.status}"; cannot succeed.`,
+                );
+              }
+
+              const updatedOrder = await this.repository.updateOrderStatus(tx, order.id, "PAID");
+              const updatedAttempt = await this.repository.updatePaymentAttemptStatus(
+                tx,
+                attempt.id,
+                "SUCCEEDED",
+                providerEventId,
+                attempt.providerReference ?? undefined,
+              );
+
+              const settlement = await this.ensureSettlementForSucceededAttempt(
+                tx,
+                updatedAttempt,
+                updatedOrder,
+                {
+                  providerName: "clickpesa",
+                  providerEventId,
+                  providerReference: updatedAttempt.providerReference!,
+                  amountTzs: updatedAttempt.amountTzs,
+                },
+              );
+
+              await this.auditService.recordEvent({
+                action: "PAYMENT_WEBHOOK_SETTLED",
+                resourceType: "payment_attempt",
+                resourceId: updatedAttempt.id,
+                actorId: updatedOrder.customerId,
+                metadata: {
+                  orderId: updatedOrder.id,
+                  outcome: "SUCCEEDED",
+                  providerName: "clickpesa",
+                  providerReference: updatedAttempt.providerReference,
+                  providerEventId,
+                  amountTzs: updatedAttempt.amountTzs,
+                  settlementId: settlement.id,
+                  channel: dto.channel,
+                  executionSource: "CLICKPESA_WEBHOOK",
+                },
+                tx,
+                failClosed: true,
+              });
+
+              await this.fulfillmentService.enqueueFulfillment(tx, updatedOrder.id);
+
+              return {
+                processed: true,
+                status: "SUCCEEDED",
+                idempotentReplay: false,
+              };
+            }
+
+            // If incoming event is FAILURE / CANCELLATION
+            if (isFailure) {
+              if (attempt.status === "PENDING" || attempt.status === "UNKNOWN") {
+                const targetStatus = normalizedStatus === "CANCELLED" ? "CANCELLED" : "FAILED";
+                await this.repository.updatePaymentAttemptStatus(
+                  tx,
+                  attempt.id,
+                  targetStatus,
+                  providerEventId,
+                  attempt.providerReference ?? undefined,
+                );
+
+                await this.auditService.recordEvent({
+                  action: "PAYMENT_ATTEMPT_CONFIRM",
+                  resourceType: "payment_attempt",
+                  resourceId: attempt.id,
+                  actorId: order.customerId,
+                  metadata: {
+                    orderId: order.id,
+                    outcome: targetStatus,
+                    providerName: "clickpesa",
+                    providerReference: attempt.providerReference,
+                    providerEventId,
+                    amountTzs: attempt.amountTzs,
+                    executionSource: "CLICKPESA_WEBHOOK",
+                  },
+                  tx,
+                  failClosed: true,
+                });
+              }
+
+              return {
+                processed: true,
+                status: attempt.status,
+                idempotentReplay: false,
+              };
+            }
+
+            return { processed: true, status: attempt.status };
+          },
+          { isolationLevel: "repeatable read" },
+        );
+      } catch (error: unknown) {
+        lastError = error;
+        const err = error as { code?: string; message?: string } | undefined;
+        const isConflict =
+          err?.code === "23505" ||
+          err?.code === "40001" ||
+          String(err?.message ?? "").includes("could not serialize");
+
+        if (isConflict && loop < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 25 * loop));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  async processPalmPesaWebhook(
+    dto: PalmPesaWebhookDto,
+    rawPayload: unknown,
+    signatureHeader?: string,
+    timestampHeader?: string | number,
+  ): Promise<{
+    processed: boolean;
+    status: string;
+    idempotentReplay?: boolean;
+    reason?: string;
+  }> {
+    // 1. Signature validation / Unsigned status verification
+    const secret = this.environment.palmpesaSigningSecret;
+    const rawString =
+      typeof rawPayload === "string" ? rawPayload : JSON.stringify(rawPayload);
+
+    if (secret) {
+      if (!signatureHeader || timestampHeader === undefined || timestampHeader === null) {
+        throw new UnauthorizedException(
+          "Missing PalmPesa webhook signature or timestamp header.",
+        );
+      }
+      const isValid = verifyPalmPesaSignature(
+        rawString,
+        secret,
+        signatureHeader,
+        timestampHeader,
+      );
+      if (!isValid) {
+        throw new UnauthorizedException(
+          "Invalid or expired PalmPesa webhook signature.",
+        );
+      }
+    } else if (signatureHeader) {
+      throw new UnauthorizedException("PalmPesa signing secret is not configured.");
+    } else {
+      // Unsigned callback defense-in-depth:
+      // When callbacks are unsigned, do not mutate state based solely on callback claim.
+      // Verify authoritative status via gateway status endpoint.
+      const queryTarget = dto.order_id || dto.transaction_id;
+      const verified = await this.paymentGateway.queryTransactionStatus(queryTarget);
+      if (dto.status.toUpperCase() === "COMPLETED") {
+        if (verified.status !== "SUCCESS" && verified.status !== "SETTLED") {
+          throw new UnauthorizedException(
+            "Unsigned PalmPesa callback could not be verified by authoritative status query.",
+          );
+        }
+      } else {
+        if (
+          verified.status === "SUCCESS" ||
+          verified.status === "SETTLED" ||
+          verified.status === "PENDING"
+        ) {
+          throw new UnauthorizedException(
+            "Unsigned PalmPesa failure callback contradicts authoritative gateway status.",
+          );
+        }
+      }
+      if (
+        verified.providerReference &&
+        verified.providerReference !== dto.transaction_id
+      ) {
+        throw new UnauthorizedException(
+          "PalmPesa status query transaction_id does not match callback transaction_id.",
+        );
+      }
+      if (verified.amountTzs && verified.amountTzs !== dto.amount) {
+        throw new UnauthorizedException(
+          "PalmPesa status query amount does not match callback amount.",
+        );
+      }
+    }
+
+    // 2. Locate payment attempt by transaction_id (providerReference) or order_id (providerEventId)
+    let initialAttempt = await this.repository.findPaymentAttemptByProviderReference(
+      this.db,
+      "palmpesa",
+      dto.transaction_id,
+    );
+    if (!initialAttempt && dto.order_id) {
+      initialAttempt = await this.repository.findPaymentAttemptByProviderEvent(
+        this.db,
+        "palmpesa",
+        dto.order_id,
+      );
+    }
+
+    if (!initialAttempt) {
+      return {
+        processed: false,
+        status: "NOT_FOUND",
+        reason: `Payment attempt with reference ${dto.transaction_id} not found`,
+      };
+    }
+
+    // Validate identifier consistency if attempt already has values bound
+    if (
+      initialAttempt.providerReference &&
+      dto.transaction_id &&
+      initialAttempt.providerReference !== dto.transaction_id
+    ) {
+      throw new ProviderReferenceConflictException(
+        `Webhook transaction_id (${dto.transaction_id}) conflicts with attempt providerReference (${initialAttempt.providerReference}).`,
+      );
+    }
+    if (
+      initialAttempt.providerEventId &&
+      dto.order_id &&
+      initialAttempt.providerEventId !== dto.order_id
+    ) {
+      throw new ProviderReferenceConflictException(
+        `Webhook order_id (${dto.order_id}) conflicts with attempt providerEventId (${initialAttempt.providerEventId}).`,
+      );
+    }
+
+    const normalizedStatus = dto.status.toUpperCase();
+    const isSuccess = normalizedStatus === "COMPLETED";
+    const isFailure =
+      normalizedStatus === "CANCELLED" ||
+      normalizedStatus === "REJECTED" ||
+      normalizedStatus === "INITIATION_FAILED" ||
+      normalizedStatus === "EXPIRED";
+
+    if (!isSuccess && !isFailure) {
+      return {
+        processed: true,
+        status: normalizedStatus,
+        reason: "In-progress status acknowledged without mutation",
+      };
+    }
+
+    // 3. Process status update with strict transaction locks
+    const maxAttempts = 3;
+    let lastError: unknown;
+
+    for (let loop = 1; loop <= maxAttempts; loop++) {
+      try {
+        return await this.db.transaction(
+          async (tx) => {
+            const [attempt] = await tx
+              .select()
+              .from(paymentAttemptsTable)
+              .where(sql`${paymentAttemptsTable.id} = ${initialAttempt.id}`)
+              .for("update");
+
+            if (!attempt) {
+              throw new PaymentAttemptNotFoundException();
+            }
+
+            const [order] = await tx
+              .select()
+              .from(ordersTable)
+              .where(sql`${ordersTable.id} = ${attempt.orderId}`)
+              .for("update");
+
+            if (!order) {
+              throw new OrderNotFoundException();
+            }
+
+            // Financial equality invariant
+            if (dto.amount !== attempt.amountTzs || attempt.amountTzs !== order.amountTzs) {
+              throw new PaymentAmountMismatchException(
+                `Webhook amount (${dto.amount}) does not match attempt amount (${attempt.amountTzs}) or order amount (${order.amountTzs}).`,
+              );
+            }
+
+            if (dto.currency !== "TZS") {
+              throw new PaymentAmountMismatchException(
+                `Invalid currency ${dto.currency}; expected TZS.`,
+              );
+            }
+
+            const providerEventId = dto.order_id;
+            const providerReference =
+              attempt.providerReference || dto.transaction_id;
+
+            // Handle IDEMPOTENT REPLAY if attempt is already SUCCEEDED
+            if (attempt.status === "SUCCEEDED") {
+              if (!isSuccess) {
+                throw new InvalidPaymentAttemptTransitionException(
+                  "Cannot transition SUCCEEDED payment attempt to non-SUCCEEDED status.",
+                );
+              }
+
+              const existingSettlement = await this.repository.findSettlementByPaymentAttemptId(
+                tx,
+                attempt.id,
+              );
+
+              if (existingSettlement) {
+                await this.fulfillmentService.enqueueFulfillment(tx, order.id);
+                return {
+                  processed: true,
+                  status: "SUCCEEDED",
+                  idempotentReplay: true,
+                };
+              }
+
+              // Backfill settlement if missing
+              await this.ensureSettlementForSucceededAttempt(tx, attempt, order, {
+                providerName: "palmpesa",
+                providerEventId,
+                providerReference,
+                amountTzs: attempt.amountTzs,
+              });
+
+              await this.auditService.recordEvent({
+                action: "SETTLEMENT_REPLAY_BACKFILL",
+                resourceType: "payment_attempt",
+                resourceId: attempt.id,
+                actorId: order.customerId,
+                metadata: {
+                  orderId: order.id,
+                  providerEventId,
+                  providerReference,
+                  webhookEventId: dto.event_id,
+                  selcomReference: dto.selcom_reference,
+                  reason: "SUCCEEDED_REPLAY_BACKFILL",
+                },
+                tx,
+                failClosed: true,
+              });
+
+              await this.fulfillmentService.enqueueFulfillment(tx, order.id);
+              return {
+                processed: true,
+                status: "SUCCEEDED",
+                idempotentReplay: true,
+              };
+            }
+
+            if (isSuccess) {
+              const existingOrderSettlements = await tx
+                .select()
+                .from(settlementsTable)
+                .where(
+                  sql`${settlementsTable.paymentAttemptId} IN (
+                    SELECT id FROM ${paymentAttemptsTable} WHERE ${paymentAttemptsTable.orderId} = ${order.id}
+                  )`,
+                );
+
+              const [updatedOrder] = await tx
+                .update(ordersTable)
+                .set({
+                  status: "PAID",
+                  updatedAt: sql`transaction_timestamp()`,
+                })
+                .where(sql`${ordersTable.id} = ${order.id}`)
+                .returning();
+
+              const updatedAttempt = await this.repository.updatePaymentAttemptStatus(
+                tx,
+                attempt.id,
+                "SUCCEEDED",
+                providerEventId,
+                attempt.providerReference ?? undefined,
+              );
+
+              const settlement = await this.ensureSettlementForSucceededAttempt(
+                tx,
+                updatedAttempt,
+                updatedOrder!,
+                {
+                  providerName: "palmpesa",
+                  providerEventId,
+                  providerReference: updatedAttempt.providerReference!,
+                  amountTzs: updatedAttempt.amountTzs,
+                },
+              );
+
+              await this.auditService.recordEvent({
+                action: "PAYMENT_WEBHOOK_SETTLED",
+                resourceType: "payment_attempt",
+                resourceId: updatedAttempt.id,
+                actorId: updatedOrder!.customerId,
+                metadata: {
+                  orderId: updatedOrder!.id,
+                  outcome: "SUCCEEDED",
+                  providerName: "palmpesa",
+                  providerReference: updatedAttempt.providerReference,
+                  providerEventId,
+                  webhookEventId: dto.event_id,
+                  selcomReference: dto.selcom_reference,
+                  amountTzs: updatedAttempt.amountTzs,
+                  settlementId: settlement.id,
+                  channel: dto.channel,
+                  executionSource: "PALMPESA_WEBHOOK",
+                },
+                tx,
+                failClosed: true,
+              });
+
+              if (existingOrderSettlements.length > 0) {
+                await this.auditService.recordEvent({
+                  action: "DUPLICATE_PAYMENT_DETECTED",
+                  resourceType: "order",
+                  resourceId: order.id,
+                  actorId: order.customerId,
+                  metadata: {
+                    orderId: order.id,
+                    paymentAttemptId: updatedAttempt.id,
+                    settlementId: settlement.id,
+                    priorSettlementCount: existingOrderSettlements.length,
+                    amountTzs: updatedAttempt.amountTzs,
+                    providerName: "palmpesa",
+                    providerReference: updatedAttempt.providerReference,
+                    providerEventId,
+                    webhookEventId: dto.event_id,
+                    selcomReference: dto.selcom_reference,
+                    requiresManualReview: true,
+                    reason: "MULTIPLE_ATTEMPTS_SETTLED_FOR_ORDER",
+                    executionSource: "PALMPESA_WEBHOOK",
+                  },
+                  tx,
+                  failClosed: true,
+                });
+              }
+
+              await this.fulfillmentService.enqueueFulfillment(tx, updatedOrder!.id);
+
+              return {
+                processed: true,
+                status: "SUCCEEDED",
+                idempotentReplay: false,
+              };
+            }
+
+            if (isFailure) {
+              const updatedAttempt = await this.repository.updatePaymentAttemptStatus(
+                tx,
+                attempt.id,
+                "FAILED",
+                providerEventId,
+                attempt.providerReference ?? undefined,
+              );
+
+              await this.auditService.recordEvent({
+                action: "PAYMENT_WEBHOOK_FAILURE",
+                resourceType: "payment_attempt",
+                resourceId: updatedAttempt.id,
+                actorId: order.customerId,
+                metadata: {
+                  orderId: order.id,
+                  outcome: "FAILED",
+                  providerName: "palmpesa",
+                  providerReference: updatedAttempt.providerReference,
+                  providerEventId,
+                  webhookEventId: dto.event_id,
+                  selcomReference: dto.selcom_reference,
+                  amountTzs: updatedAttempt.amountTzs,
+                  reason: `Provider status: ${normalizedStatus}`,
+                  executionSource: "PALMPESA_WEBHOOK",
+                },
+                tx,
+                failClosed: true,
+              });
+
+              return {
+                processed: true,
+                status: "FAILED",
+              };
+            }
+
+            return {
+              processed: true,
+              status: normalizedStatus,
+            };
+          },
+          { isolationLevel: "repeatable read" },
+        );
+      } catch (error: unknown) {
+        lastError = error;
+        const err = error as { code?: string; message?: string } | undefined;
+        const isConflict =
+          err?.code === "23505" ||
+          err?.code === "40001" ||
+          String(err?.message ?? "").includes("could not serialize");
+
+        if (isConflict && loop < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 25 * loop));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  async reconcilePaymentAttempt(
+    attemptId: string,
+    operatorUserId: string = "SYSTEM_RECONCILIATION",
+  ): Promise<{
+    reconciled: boolean;
+    priorStatus: string;
+    currentStatus: string;
+    gatewayStatus?: string;
+  }> {
+    const attempt = await this.repository.findPaymentAttemptById(this.db, attemptId);
+    if (!attempt) {
+      throw new PaymentAttemptNotFoundException();
+    }
+
+    if (attempt.status === "SUCCEEDED") {
+      return {
+        reconciled: false,
+        priorStatus: attempt.status,
+        currentStatus: attempt.status,
+      };
+    }
+
+    const queryIdentifier = attempt.providerEventId || attempt.providerReference;
+    if (!queryIdentifier) {
+      throw new ProviderReferenceConflictException(
+        "Payment attempt lacks provider reference or event identifier for gateway query.",
+      );
+    }
+
+    const queryResult = await this.paymentGateway.queryTransactionStatus(
+      queryIdentifier,
+    );
+
+    if (queryResult.status === "SUCCESS" || queryResult.status === "SETTLED") {
+      await this.db.transaction(
+        async (tx) => {
+          const [lockedAttempt] = await tx
+            .select()
+            .from(paymentAttemptsTable)
+            .where(sql`${paymentAttemptsTable.id} = ${attempt.id}`)
+            .for("update");
+          const [lockedOrder] = await tx
+            .select()
+            .from(ordersTable)
+            .where(sql`${ordersTable.id} = ${attempt.orderId}`)
+            .for("update");
+
+          if (!lockedAttempt || !lockedOrder) {
+            return;
+          }
+
+          if (lockedAttempt.status === "SUCCEEDED") {
+            return;
+          }
+
+          const existingOrderSettlements = await tx
+            .select()
+            .from(settlementsTable)
+            .where(
+              sql`${settlementsTable.paymentAttemptId} IN (
+                SELECT id FROM ${paymentAttemptsTable} WHERE ${paymentAttemptsTable.orderId} = ${lockedOrder.id}
+              )`,
+            );
+
+          const updatedOrder = await this.repository.updateOrderStatus(tx, lockedOrder.id, "PAID");
+          const eventId = queryResult.providerEventId || attempt.providerEventId || `REC-${attempt.providerReference}`;
+          const updatedAttempt = await this.repository.updatePaymentAttemptStatus(
+            tx,
+            lockedAttempt.id,
+            "SUCCEEDED",
+            eventId,
+            attempt.providerReference ?? undefined,
+          );
+
+          const settlement = await this.ensureSettlementForSucceededAttempt(
+            tx,
+            updatedAttempt,
+            updatedOrder,
+            {
+              providerName: attempt.providerName || this.paymentGateway.providerName,
+              providerEventId: eventId,
+              providerReference: attempt.providerReference!,
+              amountTzs: lockedAttempt.amountTzs,
+            },
+          );
+
+          await this.auditService.recordEvent({
+            action: "RECONCILIATION_BACKFILL",
+            resourceType: "settlement",
+            resourceId: settlement.id,
+            actorId: /^[0-9a-f-]{36}$/i.test(operatorUserId) ? operatorUserId : null,
+            metadata: {
+              paymentAttemptId: attempt.id,
+              orderId: lockedOrder.id,
+              executionSource: "GATEWAY_STATUS_RECONCILIATION",
+              providerEventId: eventId,
+              providerReference: attempt.providerReference,
+              amountTzs: lockedAttempt.amountTzs,
+            },
+            tx,
+            failClosed: true,
+          });
+
+          if (existingOrderSettlements.length > 0) {
+            await this.auditService.recordEvent({
+              action: "DUPLICATE_PAYMENT_DETECTED",
+              resourceType: "order",
+              resourceId: lockedOrder.id,
+              actorId: lockedOrder.customerId,
+              metadata: {
+                orderId: lockedOrder.id,
+                paymentAttemptId: updatedAttempt.id,
+                settlementId: settlement.id,
+                priorSettlementCount: existingOrderSettlements.length,
+                amountTzs: updatedAttempt.amountTzs,
+                providerName: attempt.providerName || this.paymentGateway.providerName,
+                providerReference: updatedAttempt.providerReference,
+                providerEventId: eventId,
+                requiresManualReview: true,
+                reason: "MULTIPLE_ATTEMPTS_SETTLED_FOR_ORDER",
+                executionSource: "GATEWAY_STATUS_RECONCILIATION",
+              },
+              tx,
+              failClosed: true,
+            });
+          }
+
+          await this.fulfillmentService.enqueueFulfillment(tx, lockedOrder.id);
+        },
+        { isolationLevel: "repeatable read" },
+      );
+    } else if (
+      queryResult.status === "FAILED" ||
+      queryResult.status === "REFUNDED" ||
+      queryResult.status === "REVERSED"
+    ) {
+      if (attempt.status === "PENDING" || attempt.status === "UNKNOWN") {
+        await this.repository.updatePaymentAttemptStatus(
+          this.db,
+          attempt.id,
+          "FAILED",
+          queryResult.providerEventId,
+          attempt.providerReference ?? undefined,
+        );
+      }
+    } else if (
+      queryResult.status === "NOT_FOUND" &&
+      Date.now() - attempt.createdAt.getTime() > 30 * 60 * 1000
+    ) {
+      if (attempt.status === "PENDING" || attempt.status === "UNKNOWN") {
+        await this.repository.updatePaymentAttemptStatus(
+          this.db,
+          attempt.id,
+          "EXPIRED",
+          undefined,
+          attempt.providerReference ?? undefined,
+        );
+      }
+    }
+
+    const fresh = await this.repository.findPaymentAttemptById(this.db, attemptId);
+    return {
+      reconciled: fresh?.status !== attempt.status,
+      priorStatus: attempt.status,
+      currentStatus: fresh?.status ?? attempt.status,
+      gatewayStatus: queryResult.status,
+    };
+  }
 }
 

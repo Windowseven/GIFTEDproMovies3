@@ -62,3 +62,78 @@ test("rejects invalid origins, request limits, and untrusted proxy values", () =
     /TRUSTED_PROXY_CIDRS/,
   );
 });
+
+test("customer streaming lockout defaults to false and enforces strict boolean parsing", () => {
+  const defaultCfg = loadEnvironment(validBaseEnvironment);
+  assert.equal(defaultCfg.customerStreamingEnabled, false);
+
+  const disabledCfg = loadEnvironment({
+    ...validBaseEnvironment,
+    CUSTOMER_STREAMING_ENABLED: "false",
+  });
+  assert.equal(disabledCfg.customerStreamingEnabled, false);
+
+  const enabledCfg = loadEnvironment({
+    ...validBaseEnvironment,
+    CUSTOMER_STREAMING_ENABLED: "true",
+  });
+  assert.equal(enabledCfg.customerStreamingEnabled, true);
+
+  assert.throws(
+    () =>
+      loadEnvironment({
+        ...validBaseEnvironment,
+        CUSTOMER_STREAMING_ENABLED: "maybe",
+      }),
+    /CUSTOMER_STREAMING_ENABLED.*must be a boolean/,
+  );
+});
+
+test("media storage provider defaults to simulator and validates R2 required credentials", () => {
+  const defaultCfg = loadEnvironment(validBaseEnvironment);
+  assert.equal(defaultCfg.mediaStorageProvider, "simulator");
+
+  assert.throws(
+    () =>
+      loadEnvironment({
+        ...validBaseEnvironment,
+        MEDIA_STORAGE_PROVIDER: "invalid_provider",
+      }),
+    /MEDIA_STORAGE_PROVIDER.*must be either 'simulator' or 'r2'/,
+  );
+
+  assert.throws(
+    () =>
+      loadEnvironment({
+        ...validBaseEnvironment,
+        MEDIA_STORAGE_PROVIDER: "r2",
+      }),
+    /CLOUDFLARE_ACCOUNT_ID.*is required when MEDIA_STORAGE_PROVIDER is 'r2'/,
+  );
+
+  assert.throws(
+    () =>
+      loadEnvironment({
+        ...validBaseEnvironment,
+        MEDIA_STORAGE_PROVIDER: "r2",
+        CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
+      }),
+    /R2_ACCESS_KEY_ID.*is required when MEDIA_STORAGE_PROVIDER is 'r2'/,
+  );
+
+  const validR2Cfg = loadEnvironment({
+    ...validBaseEnvironment,
+    MEDIA_STORAGE_PROVIDER: "r2",
+    CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
+    R2_ACCESS_KEY_ID: "test-access-key-id",
+    R2_SECRET_ACCESS_KEY: "test-secret-access-key",
+  });
+  assert.equal(validR2Cfg.mediaStorageProvider, "r2");
+  assert.equal(validR2Cfg.r2AccountId, "07e862129ce4083b383e85e2bf2ff0f8");
+  assert.equal(validR2Cfg.r2BucketName, "giftedpro-staging-media-downloads");
+  assert.equal(
+    validR2Cfg.r2Endpoint,
+    "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
+  );
+});
+

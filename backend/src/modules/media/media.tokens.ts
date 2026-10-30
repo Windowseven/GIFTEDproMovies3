@@ -1,0 +1,2 @@
+export const MEDIA_STORAGE_PORT = Symbol("MEDIA_STORAGE_PORT");
+export const PLAYBACK_SIGNER_PORT = Symbol("PLAYBACK_SIGNER_PORT");
