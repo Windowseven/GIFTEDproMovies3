@@ -8,7 +8,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DRIZZLE_DATABASE } from "../../infrastructure/database/database.tokens.js";
 import type { ApplicationDatabase } from "../../infrastructure/database/database.module.js";
@@ -24,6 +24,7 @@ import {
 } from "../../infrastructure/database/schemas/commercial.schema.js";
 import { mediaAssetSupersessionsTable } from "../../infrastructure/database/schemas/media-supersessions.schema.js";
 import { downloadAttemptsTable } from "../../infrastructure/database/schemas/download-attempts.schema.js";
+import { djVoiceArtistsTable } from "../../infrastructure/database/schemas/dj-voice-artists.schema.js";
 import { CommercialAccessService } from "../commercial/commercial-access.service.js";
 import { AuditService } from "../audit/audit.service.js";
 import { ENVIRONMENT_CONFIG } from "../../config/tokens.js";
@@ -39,6 +40,13 @@ import type { StaffPreviewTokenResult } from "./dto/staff-preview-token.dto.js";
 import type { DownloadAuthorizeDto, DownloadAuthorizeResult } from "./dto/download-authorize.dto.js";
 import type { MediaSupersedeDto, MediaSupersedeResult } from "./dto/media-supersede.dto.js";
 import type { ReportDownloadDeliveryDto, ReportDownloadDeliveryResult } from "./dto/report-download-delivery.dto.js";
+import type {
+  DownloadHistoryQueryDto,
+  DownloadHistoryResponse,
+  DownloadLicensesResponse,
+  DownloadHistoryItem,
+  DownloadLicenseItem,
+} from "./dto/download-history-query.dto.js";
 
 function getFileExtension(contentType: string): string {
   const map: Record<string, string> = {
@@ -1034,16 +1042,10 @@ export class MediaService {
           })
           .where(eq(downloadAttemptsTable.id, existingFailedAttempt.id));
 
-        let downloadUrl: string;
-        if (this.storage.generatePresignedDownloadUrl) {
-          downloadUrl = await this.storage.generatePresignedDownloadUrl({
-            storageKey: downloadFileKey,
-            expiresInSeconds: 900,
-          });
-        } else {
-          const baseDownloadUrl = this.storage.getPlaybackUrl(downloadFileKey);
-          downloadUrl = `${baseDownloadUrl}?token=${token}`;
-        }
+        const downloadUrl = await this.storage.generatePresignedDownloadUrl({
+          storageKey: downloadFileKey,
+          expiresInSeconds: 900,
+        });
 
         await this.auditService.recordEvent({
           action: "CUSTOMER_MEDIA_DOWNLOAD_RETRY_AUTHORIZED",
@@ -1157,16 +1159,10 @@ export class MediaService {
         });
       }
 
-      let downloadUrl: string;
-      if (this.storage.generatePresignedDownloadUrl) {
-        downloadUrl = await this.storage.generatePresignedDownloadUrl({
-          storageKey: downloadFileKey,
-          expiresInSeconds: 900,
-        });
-      } else {
-        const baseDownloadUrl = this.storage.getPlaybackUrl(downloadFileKey);
-        downloadUrl = `${baseDownloadUrl}?token=${token}`;
-      }
+      const downloadUrl = await this.storage.generatePresignedDownloadUrl({
+        storageKey: downloadFileKey,
+        expiresInSeconds: 900,
+      });
 
       await this.auditService.recordEvent({
         action: "CUSTOMER_MEDIA_DOWNLOAD_AUTHORIZED",
@@ -1290,5 +1286,432 @@ export class MediaService {
       };
     }
   }
+
+  /**
+   * Calculates remaining download quota for a given order and plan limit configuration.
+   * Returns null if the plan has no download quota limit (unlimited).
+   */
+  async calculateQuotaRemaining(
+    orderId: string,
+    downloadLimit: number | null,
+    downloadLimitType: string | null,
+  ): Promise<number | null> {
+    if (downloadLimit === null || downloadLimit === undefined) {
+      return null;
+    }
+
+    if (downloadLimitType === "UNIQUE_TITLES") {
+      const distinctTitlesResult = await this.db.execute(
+        sql`SELECT COUNT(DISTINCT content_id)::int as cnt FROM download_attempts WHERE order_id = ${orderId} AND status IN ('PENDING', 'COMPLETED', 'FAILED')`,
+      );
+      const distinctCount = (distinctTitlesResult.rows[0] as { cnt: number })?.cnt ?? 0;
+      return Math.max(0, downloadLimit - distinctCount);
+    } else {
+      const countResult = await this.db.execute(
+        sql`SELECT COUNT(*)::int as cnt FROM download_attempts WHERE order_id = ${orderId} AND status IN ('PENDING', 'COMPLETED', 'FAILED')`,
+      );
+      const totalCount = (countResult.rows[0] as { cnt: number })?.cnt ?? 0;
+      return Math.max(0, downloadLimit - totalCount);
+    }
+  }
+
+  /**
+   * Retrieves download attempt history for a customer with optional status filtering and pagination.
+   */
+  async getDownloadHistory(
+    customerId: string,
+    query: DownloadHistoryQueryDto,
+  ): Promise<DownloadHistoryResponse> {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(50, Math.max(1, query.limit || 20));
+    const offset = (page - 1) * limit;
+
+    const whereConditions = [eq(downloadAttemptsTable.customerId, customerId)];
+    if (query.status) {
+      whereConditions.push(eq(downloadAttemptsTable.status, query.status));
+    }
+
+    const [countRow] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(downloadAttemptsTable)
+      .where(and(...whereConditions));
+    const total = countRow?.count ?? 0;
+
+    const attempts = await this.db
+      .select({
+        attempt: downloadAttemptsTable,
+        planDownloadLimit: planVersionsTable.downloadLimit,
+        planDownloadLimitType: planVersionsTable.downloadLimitType,
+      })
+      .from(downloadAttemptsTable)
+      .innerJoin(
+        planVersionsTable,
+        eq(downloadAttemptsTable.planVersionId, planVersionsTable.id),
+      )
+      .where(and(...whereConditions))
+      .orderBy(desc(downloadAttemptsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    if (attempts.length === 0) {
+      return {
+        downloads: [],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 1,
+        },
+      };
+    }
+
+    // Collect IDs for batch resolution
+    const movieContentIds = new Set<string>();
+    const editionIds = new Set<string>();
+    const episodeIds = new Set<string>();
+
+    for (const { attempt } of attempts) {
+      if (attempt.contentKind === "movie") {
+        movieContentIds.add(attempt.contentId);
+      }
+      if (attempt.editionId) {
+        editionIds.add(attempt.editionId);
+      }
+      if (attempt.episodeId) {
+        episodeIds.add(attempt.episodeId);
+      }
+    }
+
+    // Batch query movies
+    const moviesMap = new Map<
+      string,
+      { title: string; slug: string; posterUrl: string | null; backdropUrl: string | null }
+    >();
+    if (movieContentIds.size > 0) {
+      const movies = await this.db
+        .select({
+          id: contentTable.id,
+          title: contentTable.title,
+          slug: contentTable.slug,
+          posterUrl: contentTable.posterUrl,
+          backdropUrl: contentTable.backdropUrl,
+        })
+        .from(contentTable)
+        .where(inArray(contentTable.id, Array.from(movieContentIds)));
+      for (const m of movies) {
+        moviesMap.set(m.id, m);
+      }
+    }
+
+    // Batch query editions with DJ names
+    const editionsMap = new Map<string, { djName: string | null }>();
+    if (editionIds.size > 0) {
+      const editions = await this.db
+        .select({
+          id: movieEditionsTable.id,
+          djName: djVoiceArtistsTable.stageName,
+        })
+        .from(movieEditionsTable)
+        .leftJoin(djVoiceArtistsTable, eq(movieEditionsTable.djId, djVoiceArtistsTable.id))
+        .where(inArray(movieEditionsTable.id, Array.from(editionIds)));
+      for (const ed of editions) {
+        editionsMap.set(ed.id, { djName: ed.djName ?? null });
+      }
+    }
+
+    // Batch query episodes with DJ names
+    const episodesMap = new Map<
+      string,
+      { title: string; thumbnailUrl: string | null; djName: string | null }
+    >();
+    if (episodeIds.size > 0) {
+      const episodes = await this.db
+        .select({
+          id: episodesTable.id,
+          title: episodesTable.title,
+          thumbnailUrl: episodesTable.thumbnailUrl,
+          djName: djVoiceArtistsTable.stageName,
+        })
+        .from(episodesTable)
+        .leftJoin(djVoiceArtistsTable, eq(episodesTable.djId, djVoiceArtistsTable.id))
+        .where(inArray(episodesTable.id, Array.from(episodeIds)));
+      for (const ep of episodes) {
+        episodesMap.set(ep.id, {
+          title: ep.title,
+          thumbnailUrl: ep.thumbnailUrl ?? null,
+          djName: ep.djName ?? null,
+        });
+      }
+    }
+
+    // Memoize quota calculations per orderId
+    const quotaMap = new Map<string, number | null>();
+    const now = new Date();
+
+    const downloads: DownloadHistoryItem[] = [];
+
+    for (const { attempt, planDownloadLimit, planDownloadLimitType } of attempts) {
+      let quotaRemaining: number | null = null;
+      if (quotaMap.has(attempt.orderId)) {
+        quotaRemaining = quotaMap.get(attempt.orderId)!;
+      } else {
+        quotaRemaining = await this.calculateQuotaRemaining(
+          attempt.orderId,
+          planDownloadLimit,
+          planDownloadLimitType,
+        );
+        quotaMap.set(attempt.orderId, quotaRemaining);
+      }
+
+      let title = "Unknown Title";
+      let slug = "";
+      let posterUrl: string | null = null;
+      let backdropUrl: string | null = null;
+      let djName: string | null = null;
+
+      if (attempt.contentKind === "movie") {
+        const movie = moviesMap.get(attempt.contentId);
+        if (movie) {
+          title = movie.title;
+          slug = movie.slug;
+          posterUrl = movie.posterUrl;
+          backdropUrl = movie.backdropUrl;
+        }
+        if (attempt.editionId) {
+          djName = editionsMap.get(attempt.editionId)?.djName ?? null;
+        }
+      } else if (attempt.contentKind === "episode") {
+        const episode = attempt.episodeId ? episodesMap.get(attempt.episodeId) : null;
+        if (episode) {
+          title = episode.title;
+          slug = attempt.episodeId ?? attempt.contentId;
+          posterUrl = episode.thumbnailUrl;
+          djName = episode.djName;
+        }
+      }
+
+      const isRetryEligible =
+        attempt.status === "FAILED" && new Date(attempt.retryGraceExpiresAt) > now;
+
+      downloads.push({
+        attemptId: attempt.id,
+        orderId: attempt.orderId,
+        entitlementId: attempt.entitlementId,
+        contentKind: attempt.contentKind,
+        contentId: attempt.contentId,
+        title,
+        slug,
+        editionId: attempt.editionId,
+        episodeId: attempt.episodeId,
+        djName,
+        posterUrl,
+        backdropUrl,
+        status: attempt.status,
+        attemptNumber: attempt.attemptNumber,
+        completedAt: attempt.completedAt ? attempt.completedAt.toISOString() : null,
+        tokenExpiresAt: attempt.tokenExpiresAt.toISOString(),
+        retryGraceExpiresAt: attempt.retryGraceExpiresAt.toISOString(),
+        isRetryEligible,
+        downloadLimit: planDownloadLimit,
+        downloadLimitType: planDownloadLimitType,
+        quotaRemaining,
+        failureReason: attempt.failureReason,
+        createdAt: attempt.createdAt.toISOString(),
+      });
+    }
+
+    return {
+      downloads,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  }
+
+  /**
+   * Retrieves active, download-eligible commercial licenses for a customer,
+   * calculating real-time remaining quota and completed download flags.
+   */
+  async getDownloadLicenses(customerId: string): Promise<DownloadLicensesResponse> {
+    const now = new Date();
+
+    // 1. Fetch active entitlements for customer joined with order and plan_version
+    const activeEntitlements = await this.db
+      .select({
+        entitlement: entitlementsTable,
+        orderId: entitlementOrderEffectsTable.orderId,
+        downloadLimit: planVersionsTable.downloadLimit,
+        downloadLimitType: planVersionsTable.downloadLimitType,
+      })
+      .from(entitlementsTable)
+      .innerJoin(
+        entitlementOrderEffectsTable,
+        eq(entitlementsTable.id, entitlementOrderEffectsTable.entitlementId),
+      )
+      .innerJoin(
+        ordersTable,
+        eq(entitlementOrderEffectsTable.orderId, ordersTable.id),
+      )
+      .innerJoin(
+        planVersionsTable,
+        eq(ordersTable.planVersionId, planVersionsTable.id),
+      )
+      .where(
+        and(
+          eq(entitlementsTable.customerId, customerId),
+          eq(entitlementsTable.status, "ACTIVE"),
+          sql`${entitlementsTable.expiresAt} > ${now}`,
+        ),
+      )
+      .orderBy(desc(entitlementsTable.createdAt));
+
+    // Filter out plans where downloadLimit === 0 (downloads explicitly disabled for plan)
+    const downloadEligible = activeEntitlements.filter(
+      (e) => e.downloadLimit === null || e.downloadLimit > 0,
+    );
+
+    if (downloadEligible.length === 0) {
+      return { licenses: [] };
+    }
+
+    // Collect content IDs for batch fetching titles
+    const movieIds = new Set<string>();
+    const episodeIds = new Set<string>();
+
+    for (const item of downloadEligible) {
+      if (item.entitlement.targetKind === "MOVIE" && item.entitlement.targetMovieContentId) {
+        movieIds.add(item.entitlement.targetMovieContentId);
+      } else if (item.entitlement.targetKind === "EPISODE" && item.entitlement.targetEpisodeId) {
+        episodeIds.add(item.entitlement.targetEpisodeId);
+      }
+    }
+
+    const moviesMap = new Map<string, { title: string; slug: string; posterUrl: string | null }>();
+    if (movieIds.size > 0) {
+      const movies = await this.db
+        .select({
+          id: contentTable.id,
+          title: contentTable.title,
+          slug: contentTable.slug,
+          posterUrl: contentTable.posterUrl,
+        })
+        .from(contentTable)
+        .where(inArray(contentTable.id, Array.from(movieIds)));
+      for (const m of movies) {
+        moviesMap.set(m.id, m);
+      }
+    }
+
+    const episodesMap = new Map<string, { title: string; thumbnailUrl: string | null }>();
+    if (episodeIds.size > 0) {
+      const episodes = await this.db
+        .select({
+          id: episodesTable.id,
+          title: episodesTable.title,
+          thumbnailUrl: episodesTable.thumbnailUrl,
+        })
+        .from(episodesTable)
+        .where(inArray(episodesTable.id, Array.from(episodeIds)));
+      for (const ep of episodes) {
+        episodesMap.set(ep.id, {
+          title: ep.title,
+          thumbnailUrl: ep.thumbnailUrl ?? null,
+        });
+      }
+    }
+
+    // Query download_attempts for customer to find completed/latest statuses per order
+    const attempts = await this.db
+      .select({
+        orderId: downloadAttemptsTable.orderId,
+        status: downloadAttemptsTable.status,
+        createdAt: downloadAttemptsTable.createdAt,
+      })
+      .from(downloadAttemptsTable)
+      .where(eq(downloadAttemptsTable.customerId, customerId))
+      .orderBy(desc(downloadAttemptsTable.createdAt));
+
+    const completedOrders = new Set<string>();
+    const latestStatusByOrder = new Map<string, string>();
+
+    for (const att of attempts) {
+      if (att.status === "COMPLETED") {
+        completedOrders.add(att.orderId);
+      }
+      if (!latestStatusByOrder.has(att.orderId)) {
+        latestStatusByOrder.set(att.orderId, att.status);
+      }
+    }
+
+    const quotaMap = new Map<string, number | null>();
+    const licenses: DownloadLicenseItem[] = [];
+
+    for (const item of downloadEligible) {
+      const { entitlement, orderId, downloadLimit, downloadLimitType } = item;
+
+      let quotaRemaining: number | null = null;
+      if (quotaMap.has(orderId)) {
+        quotaRemaining = quotaMap.get(orderId)!;
+      } else {
+        quotaRemaining = await this.calculateQuotaRemaining(
+          orderId,
+          downloadLimit,
+          downloadLimitType,
+        );
+        quotaMap.set(orderId, quotaRemaining);
+      }
+
+      let contentId = "";
+      let title = "";
+      let slug = "";
+      let posterUrl: string | null = null;
+
+      if (entitlement.targetKind === "MOVIE") {
+        contentId = entitlement.targetMovieContentId ?? "";
+        const movie = moviesMap.get(contentId);
+        title = movie?.title ?? "Movie";
+        slug = movie?.slug ?? "";
+        posterUrl = movie?.posterUrl ?? null;
+      } else if (entitlement.targetKind === "EPISODE") {
+        contentId = entitlement.targetEpisodeId ?? "";
+        const ep = episodesMap.get(contentId);
+        title = ep?.title ?? "Episode";
+        slug = contentId;
+        posterUrl = ep?.thumbnailUrl ?? null;
+      } else if (entitlement.targetKind === "CATALOG") {
+        contentId = entitlement.id;
+        title = "Full Catalog Access";
+        slug = "catalog";
+      } else {
+        contentId =
+          entitlement.targetSeriesContentId ?? entitlement.targetSeasonId ?? entitlement.id;
+        title = `${entitlement.targetKind} Access`;
+        slug = contentId;
+      }
+
+      licenses.push({
+        entitlementId: entitlement.id,
+        orderId,
+        targetKind: entitlement.targetKind,
+        contentId,
+        title,
+        slug,
+        posterUrl,
+        startsAt: entitlement.startsAt.toISOString(),
+        expiresAt: entitlement.expiresAt.toISOString(),
+        downloadLimit,
+        downloadLimitType,
+        quotaRemaining,
+        hasCompletedDownload: completedOrders.has(orderId),
+        latestAttemptStatus: latestStatusByOrder.get(orderId) ?? null,
+      });
+    }
+
+    return { licenses };
+  }
 }
+
 

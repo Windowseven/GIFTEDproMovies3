@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { CurrentUser, Public, RequireCapability, Roles } from "../identity/decorators/index.js";
@@ -22,6 +24,11 @@ import type { StaffPreviewTokenResult } from "./dto/staff-preview-token.dto.js";
 import { DownloadAuthorizeDto, type DownloadAuthorizeResult } from "./dto/download-authorize.dto.js";
 import { MediaSupersedeDto, type MediaSupersedeResult } from "./dto/media-supersede.dto.js";
 import { ReportDownloadDeliveryDto, type ReportDownloadDeliveryResult } from "./dto/report-download-delivery.dto.js";
+import {
+  DownloadHistoryQueryDto,
+  type DownloadHistoryResponse,
+  type DownloadLicensesResponse,
+} from "./dto/download-history-query.dto.js";
 
 @Controller()
 @UseGuards(SessionAuthGuard)
@@ -116,4 +123,26 @@ export class MediaController {
   ): Promise<ReportDownloadDeliveryResult> {
     return this.mediaService.reportDownloadDelivery(customerId, dto);
   }
+
+  @Get("download/history")
+  @UseGuards(RolesGuard)
+  @Roles("customer")
+  @HttpCode(HttpStatus.OK)
+  async getDownloadHistory(
+    @CurrentUser("id") customerId: string,
+    @Query() query: DownloadHistoryQueryDto,
+  ): Promise<DownloadHistoryResponse> {
+    return this.mediaService.getDownloadHistory(customerId, query);
+  }
+
+  @Get("download/licenses")
+  @UseGuards(RolesGuard)
+  @Roles("customer")
+  @HttpCode(HttpStatus.OK)
+  async getDownloadLicenses(
+    @CurrentUser("id") customerId: string,
+  ): Promise<DownloadLicensesResponse> {
+    return this.mediaService.getDownloadLicenses(customerId);
+  }
 }
+

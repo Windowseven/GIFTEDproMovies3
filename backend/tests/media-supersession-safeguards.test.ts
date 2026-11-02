@@ -11,7 +11,7 @@ import { configureHttpApplication } from "../src/http/configure-http-application
 import { ApiExceptionFilter } from "../src/http/api-exception.filter.js";
 import { generateSecureToken, hashToken } from "../src/modules/identity/utils/token.utils.js";
 import { MEDIA_STORAGE_PORT } from "../src/modules/media/media.tokens.js";
-import type { LocalSimulatorMediaAdapter } from "../src/modules/media/adapters/local-simulator-media.adapter.js";
+import type { MediaStoragePort } from "../src/modules/media/ports/media-storage.port.js";
 
 const DATABASE_URL =
   process.env.PHASE1_TEST_DATABASE_URL ??
@@ -168,7 +168,7 @@ test("Media asset replacement and supersession safeguards suite (GPM-AUDIT-017)"
   app.useGlobalFilters(new ApiExceptionFilter(fastifyInstance.log));
   await app.init();
 
-  const storage = moduleFixture.get<LocalSimulatorMediaAdapter>(MEDIA_STORAGE_PORT);
+  const storage = moduleFixture.get<MediaStoragePort>(MEDIA_STORAGE_PORT);
 
   t.after(async () => {
     await app.close();
@@ -201,7 +201,7 @@ test("Media asset replacement and supersession safeguards suite (GPM-AUDIT-017)"
 
   await t.test("MSS-02: Complete upload for ready movie edition with active commercial entitlement throws 409", async () => {
     const fakeKey = "raw/movies/test/storageKey.mp4";
-    storage.simulateUpload(fakeKey);
+    storage.verifyObjectExists = async () => true;
 
     const res = await app.inject({
       method: "POST",
@@ -292,7 +292,7 @@ test("Media asset replacement and supersession safeguards suite (GPM-AUDIT-017)"
 
   await t.test("MSS-06: Complete upload for ready episode with active commercial entitlement throws 409", async () => {
     const fakeKey = "raw/episodes/test/storageKey.mp4";
-    storage.simulateUpload(fakeKey);
+    storage.verifyObjectExists = async () => true;
 
     const res = await app.inject({
       method: "POST",

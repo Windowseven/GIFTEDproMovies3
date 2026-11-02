@@ -44,7 +44,6 @@ export interface EnvironmentConfig {
   readonly playbackSigningKeyId?: string;
   readonly playbackTokenTtlSeconds?: number;
   readonly customerStreamingEnabled?: boolean;
-  readonly mediaStorageProvider?: "simulator" | "r2";
   readonly r2AccountId?: string;
   readonly r2AccessKeyId?: string;
   readonly r2SecretAccessKey?: string;
@@ -375,20 +374,72 @@ function parseBoolean(
   throw new InvalidEnvironmentError(key, "must be a boolean (true or false)");
 }
 
-function parseMediaStorageProvider(
-  env: NodeJS.ProcessEnv,
-): "simulator" | "r2" {
-  const raw = env.MEDIA_STORAGE_PROVIDER?.trim().toLowerCase();
-  if (raw === undefined || raw === "") {
-    return "simulator";
+interface R2Configuration {
+  readonly r2AccountId: string;
+  readonly r2AccessKeyId: string;
+  readonly r2SecretAccessKey: string;
+  readonly r2BucketName: string;
+  readonly r2Endpoint: string;
+}
+
+function parseR2Configuration(env: NodeJS.ProcessEnv): R2Configuration {
+  const providerRaw = env.MEDIA_STORAGE_PROVIDER?.trim();
+  if (providerRaw !== undefined && providerRaw !== "") {
+    throw new InvalidEnvironmentError(
+      "MEDIA_STORAGE_PROVIDER",
+      "is no longer supported; Cloudflare R2 is the sole media storage provider",
+    );
   }
-  if (raw === "simulator" || raw === "r2") {
-    return raw;
+
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  if (!accountId) {
+    throw new InvalidEnvironmentError("CLOUDFLARE_ACCOUNT_ID", "is required");
   }
-  throw new InvalidEnvironmentError(
-    "MEDIA_STORAGE_PROVIDER",
-    "must be either 'simulator' or 'r2'",
-  );
+
+  const accessKeyId = env.R2_ACCESS_KEY_ID?.trim();
+  if (!accessKeyId) {
+    throw new InvalidEnvironmentError("R2_ACCESS_KEY_ID", "is required");
+  }
+
+  const secretAccessKey = env.R2_SECRET_ACCESS_KEY?.trim();
+  if (!secretAccessKey) {
+    throw new InvalidEnvironmentError("R2_SECRET_ACCESS_KEY", "is required");
+  }
+
+  const bucketName = env.R2_BUCKET_NAME?.trim();
+  if (!bucketName) {
+    throw new InvalidEnvironmentError("R2_BUCKET_NAME", "is required");
+  }
+
+  const endpointRaw = env.R2_ENDPOINT?.trim();
+  if (!endpointRaw) {
+    throw new InvalidEnvironmentError("R2_ENDPOINT", "is required");
+  }
+
+  let parsedEndpoint: URL;
+  try {
+    parsedEndpoint = new URL(endpointRaw);
+  } catch {
+    throw new InvalidEnvironmentError(
+      "R2_ENDPOINT",
+      "must be a valid HTTP or HTTPS URL",
+    );
+  }
+
+  if (parsedEndpoint.protocol !== "https:" && parsedEndpoint.protocol !== "http:") {
+    throw new InvalidEnvironmentError(
+      "R2_ENDPOINT",
+      "must be a valid HTTP or HTTPS URL",
+    );
+  }
+
+  return {
+    r2AccountId: accountId,
+    r2AccessKeyId: accessKeyId,
+    r2SecretAccessKey: secretAccessKey,
+    r2BucketName: bucketName,
+    r2Endpoint: endpointRaw,
+  };
 }
 
 export function loadEnvironment(
@@ -551,35 +602,7 @@ export function loadEnvironment(
     }
   }
 
-  const mediaStorageProvider = parseMediaStorageProvider(env);
-  const r2AccountId = env.CLOUDFLARE_ACCOUNT_ID?.trim() || undefined;
-  const r2AccessKeyId = env.R2_ACCESS_KEY_ID?.trim() || undefined;
-  const r2SecretAccessKey = env.R2_SECRET_ACCESS_KEY?.trim() || undefined;
-  const r2BucketName = env.R2_BUCKET_NAME?.trim() || "giftedpro-staging-media-downloads";
-  const r2Endpoint =
-    env.R2_ENDPOINT?.trim() ||
-    (r2AccountId ? `https://${r2AccountId}.r2.cloudflarestorage.com` : undefined);
-
-  if (mediaStorageProvider === "r2") {
-    if (!r2AccountId) {
-      throw new InvalidEnvironmentError(
-        "CLOUDFLARE_ACCOUNT_ID",
-        "is required when MEDIA_STORAGE_PROVIDER is 'r2'",
-      );
-    }
-    if (!r2AccessKeyId) {
-      throw new InvalidEnvironmentError(
-        "R2_ACCESS_KEY_ID",
-        "is required when MEDIA_STORAGE_PROVIDER is 'r2'",
-      );
-    }
-    if (!r2SecretAccessKey) {
-      throw new InvalidEnvironmentError(
-        "R2_SECRET_ACCESS_KEY",
-        "is required when MEDIA_STORAGE_PROVIDER is 'r2'",
-      );
-    }
-  }
+  const r2Config = parseR2Configuration(env);
 
   return {
     appEnvironment: rawEnvironment,
@@ -708,11 +731,10 @@ export function loadEnvironment(
       "CUSTOMER_STREAMING_ENABLED",
       false,
     ),
-    mediaStorageProvider,
-    r2AccountId,
-    r2AccessKeyId,
-    r2SecretAccessKey,
-    r2BucketName,
-    r2Endpoint,
+    r2AccountId: r2Config.r2AccountId,
+    r2AccessKeyId: r2Config.r2AccessKeyId,
+    r2SecretAccessKey: r2Config.r2SecretAccessKey,
+    r2BucketName: r2Config.r2BucketName,
+    r2Endpoint: r2Config.r2Endpoint,
   };
 }

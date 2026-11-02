@@ -34,6 +34,7 @@ const databaseTestFiles = new Set([
   "admin-audit.integration.test.js",
   "media-supersession-safeguards.test.js",
   "download-authorization.integration.test.js",
+  "device-limits.integration.test.js",
 ]);
 
 
@@ -142,6 +143,11 @@ async function main() {
     APP_ENV: "test",
     DATABASE_URL: databaseUrl,
     PHASE1_TEST_DATABASE_URL: databaseUrl,
+    CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID || "07e862129ce4083b383e85e2bf2ff0f8",
+    R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID || "test-r2-access-key-id",
+    R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY || "test-r2-secret-access-key",
+    R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || "giftedpro-staging-media-downloads",
+    R2_ENDPOINT: process.env.R2_ENDPOINT || "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
   };
   let failures = 0;
 

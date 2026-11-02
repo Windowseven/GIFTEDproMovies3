@@ -11,7 +11,7 @@ import { ApiExceptionFilter } from "../src/http/api-exception.filter.js";
 import { generateSecureToken, hashToken } from "../src/modules/identity/utils/token.utils.js";
 import { computePalmPesaSignature } from "../src/modules/commercial/adapters/palmpesa-signature.validator.js";
 import { MEDIA_STORAGE_PORT, PLAYBACK_SIGNER_PORT } from "../src/modules/media/media.tokens.js";
-import type { LocalSimulatorMediaAdapter } from "../src/modules/media/adapters/local-simulator-media.adapter.js";
+import type { MediaStoragePort } from "../src/modules/media/ports/media-storage.port.js";
 import type { PlaybackSignerPort } from "../src/modules/media/ports/playback-signer.port.js";
 import { FulfillmentService } from "../src/modules/commercial/fulfillment.service.js";
 import { PaymentReconciliationWorker } from "../src/modules/commercial/workers/payment-reconciliation.worker.js";
@@ -99,6 +99,7 @@ test("Phase 5 Master Directive: PalmPesa Gateway & Streaming Delivery Integratio
 
   const palmpesaWebhookSecret = "test-palmpesa-webhook-secret-32-chars-minimum";
   process.env.PALMPESA_SIGNING_SECRET = palmpesaWebhookSecret;
+  process.env.CUSTOMER_STREAMING_ENABLED = "true";
 
   // 3. Initialize Nest test application
   const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -114,7 +115,7 @@ test("Phase 5 Master Directive: PalmPesa Gateway & Streaming Delivery Integratio
   app.useGlobalFilters(new ApiExceptionFilter(fastifyInstance.log));
   await app.init();
 
-  const mediaStorage = moduleFixture.get<LocalSimulatorMediaAdapter>(MEDIA_STORAGE_PORT);
+  const mediaStorage = moduleFixture.get<MediaStoragePort>(MEDIA_STORAGE_PORT);
   const playbackSigner = moduleFixture.get<PlaybackSignerPort>(PLAYBACK_SIGNER_PORT);
   const fulfillmentService = moduleFixture.get(FulfillmentService);
   const reconciliationWorker = moduleFixture.get(PaymentReconciliationWorker);
@@ -506,6 +507,7 @@ test("Phase 5 Master Directive: PalmPesa Gateway & Streaming Delivery Integratio
 
   await t.test("Task 5.B2: Media upload completion verifies storage and alone cannot make media playable", async () => {
     // 1. Unverified object fails with 400
+    mediaStorage.verifyObjectExists = async () => false;
     const unverifiedRes = await app.inject({
       method: "POST",
       url: "/api/v1/media/upload-complete",
@@ -519,8 +521,8 @@ test("Phase 5 Master Directive: PalmPesa Gateway & Streaming Delivery Integratio
     });
     assert.equal(unverifiedRes.statusCode, 400);
 
-    // 2. Simulate object arrival in storage simulator
-    mediaStorage.simulateUpload(presignedStorageKey);
+    // 2. Mock object arrival in R2 storage
+    mediaStorage.verifyObjectExists = async () => true;
 
     // 3. Media team confirms upload completion
     const completeRes = await app.inject({

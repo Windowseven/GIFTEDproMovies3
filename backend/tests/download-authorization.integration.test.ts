@@ -457,7 +457,9 @@ test("Offline download authorization and quota enforcement suite (GPM-AUDIT-013)
     assert.equal(data.downloadLimit, 5);
     assert.equal(data.downloadLimitType, "UNIQUE_TITLES");
     assert.ok(data.downloadToken, "Must have downloadToken");
-    assert.ok(data.downloadUrl.includes(data.downloadToken), "downloadUrl must include token");
+    assert.ok(data.downloadUrl.includes("r2.cloudflarestorage.com"), "downloadUrl must target R2 storage endpoint");
+    assert.ok(data.downloadUrl.includes("X-Amz-Signature") || data.downloadUrl.includes("X-Amz-Algorithm"), "downloadUrl must be AWS SigV4 signed");
+    assert.ok(!data.downloadUrl.includes("media-sim"), "downloadUrl must not be a simulator URL");
 
     // Cryptographic verification of token
     const claims = await playbackSigner.verifyPlaybackToken(data.downloadToken);
@@ -664,4 +666,114 @@ test("Offline download authorization and quota enforcement suite (GPM-AUDIT-013)
     );
     assert.equal(countRes.rows[0].cnt, 1);
   });
+
+  await t.test("DLA-14: GET /api/v1/download/history returns paginated history with metadata and quota projection", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/download/history?page=1&limit=10",
+      headers: { cookie: customerAllowedCookie },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.success, true);
+    assert.ok(Array.isArray(body.data.downloads));
+    assert.ok(body.data.downloads.length > 0);
+    assert.ok(body.data.pagination);
+    assert.equal(body.data.pagination.page, 1);
+    assert.equal(body.data.pagination.limit, 10);
+    assert.ok(body.data.pagination.total > 0);
+
+    const first = body.data.downloads[0];
+    assert.ok(first.attemptId);
+    assert.ok(first.orderId);
+    assert.ok(first.entitlementId);
+    assert.ok(first.title);
+    assert.ok(first.status);
+    assert.ok(typeof first.attemptNumber === "number");
+    assert.ok(first.tokenExpiresAt);
+    assert.ok(first.retryGraceExpiresAt);
+    assert.ok(typeof first.isRetryEligible === "boolean");
+    assert.ok(typeof first.quotaRemaining === "number" || first.quotaRemaining === null);
+  });
+
+  await t.test("DLA-15: GET /api/v1/download/history supports status filtering", async () => {
+    // Filter for COMPLETED
+    const resCompleted = await app.inject({
+      method: "GET",
+      url: "/api/v1/download/history?status=COMPLETED",
+      headers: { cookie: customerAllowedCookie },
+    });
+    assert.equal(resCompleted.statusCode, 200);
+    const completedBody = JSON.parse(resCompleted.body);
+    for (const item of completedBody.data.downloads) {
+      assert.equal(item.status, "COMPLETED");
+    }
+
+    // Filter for FAILED
+    const resFailed = await app.inject({
+      method: "GET",
+      url: "/api/v1/download/history?status=FAILED",
+      headers: { cookie: customerAllowedCookie },
+    });
+    assert.equal(resFailed.statusCode, 200);
+    const failedBody = JSON.parse(resFailed.body);
+    for (const item of failedBody.data.downloads) {
+      assert.equal(item.status, "FAILED");
+    }
+  });
+
+  await t.test("DLA-16: GET /api/v1/download/history customer isolation (cannot view another customer's downloads)", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/download/history",
+      headers: { cookie: customerNoEntitlementCookie },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.success, true);
+    assert.equal(body.data.downloads.length, 0);
+    assert.equal(body.data.pagination.total, 0);
+  });
+
+  await t.test("DLA-17: GET /api/v1/download/licenses returns active download-eligible licenses with quotaRemaining", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/download/licenses",
+      headers: { cookie: customerAllowedCookie },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.success, true);
+    assert.ok(Array.isArray(body.data.licenses));
+    assert.ok(body.data.licenses.length > 0);
+
+    const lic = body.data.licenses[0];
+    assert.ok(lic.entitlementId);
+    assert.ok(lic.orderId);
+    assert.ok(lic.targetKind);
+    assert.ok(lic.contentId);
+    assert.ok(lic.title);
+    assert.ok(lic.startsAt);
+    assert.ok(lic.expiresAt);
+    assert.ok(lic.downloadLimit > 0);
+    assert.ok(typeof lic.quotaRemaining === "number");
+    assert.ok(typeof lic.hasCompletedDownload === "boolean");
+  });
+
+  await t.test("DLA-18: GET /api/v1/download/licenses excludes plans where download_limit = 0", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/download/licenses",
+      headers: { cookie: customerBlockedCookie },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.equal(body.success, true);
+    assert.equal(body.data.licenses.length, 0, "Licenses with download_limit = 0 must be excluded");
+  });
 });
+

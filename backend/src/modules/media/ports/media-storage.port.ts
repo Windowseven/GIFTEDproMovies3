@@ -15,7 +15,7 @@ export interface MediaStoragePort {
   verifyObjectExists(storageKey: string): Promise<boolean>;
   deleteObject(storageKey: string): Promise<void>;
   getPlaybackUrl(storageKey: string): string;
-  generatePresignedDownloadUrl?(params: {
+  generatePresignedDownloadUrl(params: {
     storageKey: string;
     expiresInSeconds?: number;
   }): Promise<string>;

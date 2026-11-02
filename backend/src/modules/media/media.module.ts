@@ -4,7 +4,6 @@ import { CommercialModule } from "../commercial/commercial.module.js";
 import { MediaController } from "./media.controller.js";
 import { MediaService } from "./media.service.js";
 import { MEDIA_STORAGE_PORT, PLAYBACK_SIGNER_PORT } from "./media.tokens.js";
-import { LocalSimulatorMediaAdapter } from "./adapters/local-simulator-media.adapter.js";
 import { R2MediaStorageAdapter } from "./adapters/r2-media-storage.adapter.js";
 import { JwtPlaybackSignerAdapter } from "./adapters/jwt-playback-signer.adapter.js";
 import type { MediaStoragePort } from "./ports/media-storage.port.js";
@@ -21,16 +20,13 @@ import type { EnvironmentConfig } from "../../config/environment.js";
       provide: MEDIA_STORAGE_PORT,
       inject: [ENVIRONMENT_CONFIG],
       useFactory: (env: EnvironmentConfig): MediaStoragePort => {
-        if (env.mediaStorageProvider === "r2") {
-          return new R2MediaStorageAdapter({
-            accountId: env.r2AccountId!,
-            accessKeyId: env.r2AccessKeyId!,
-            secretAccessKey: env.r2SecretAccessKey!,
-            bucketName: env.r2BucketName || "giftedpro-staging-media-downloads",
-            endpoint: env.r2Endpoint,
-          });
-        }
-        return new LocalSimulatorMediaAdapter();
+        return new R2MediaStorageAdapter({
+          accountId: env.r2AccountId!,
+          accessKeyId: env.r2AccessKeyId!,
+          secretAccessKey: env.r2SecretAccessKey!,
+          bucketName: env.r2BucketName!,
+          endpoint: env.r2Endpoint,
+        });
       },
     },
     {

@@ -33,6 +33,11 @@ before(async () => {
     DATABASE_URL:
       "postgresql://tester:tester@127.0.0.1:5432/giftedpro_phase1_test",
     REQUEST_BODY_LIMIT_BYTES: "1024",
+    CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
+    R2_ACCESS_KEY_ID: "test-r2-access-key-id",
+    R2_SECRET_ACCESS_KEY: "test-r2-secret-access-key",
+    R2_BUCKET_NAME: "giftedpro-staging-media-downloads",
+    R2_ENDPOINT: "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
   });
 
   testingModule = await Test.createTestingModule({

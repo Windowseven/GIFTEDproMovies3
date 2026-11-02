@@ -5,6 +5,11 @@ import { InvalidEnvironmentError, loadEnvironment } from "../src/config/environm
 const validBaseEnvironment: NodeJS.ProcessEnv = {
   APP_ENV: "test",
   DATABASE_URL: "postgresql://tester:tester@127.0.0.1:5432/giftedpro_phase1_test",
+  CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
+  R2_ACCESS_KEY_ID: "test-r2-access-key-id",
+  R2_SECRET_ACCESS_KEY: "test-r2-secret-access-key",
+  R2_BUCKET_NAME: "giftedpro-staging-media-downloads",
+  R2_ENDPOINT: "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
 };
 
 test("loads a valid non-production configuration with safe proxy defaults", () => {
@@ -89,51 +94,125 @@ test("customer streaming lockout defaults to false and enforces strict boolean p
   );
 });
 
-test("media storage provider defaults to simulator and validates R2 required credentials", () => {
-  const defaultCfg = loadEnvironment(validBaseEnvironment);
-  assert.equal(defaultCfg.mediaStorageProvider, "simulator");
-
-  assert.throws(
-    () =>
-      loadEnvironment({
-        ...validBaseEnvironment,
-        MEDIA_STORAGE_PROVIDER: "invalid_provider",
-      }),
-    /MEDIA_STORAGE_PROVIDER.*must be either 'simulator' or 'r2'/,
-  );
-
-  assert.throws(
-    () =>
-      loadEnvironment({
-        ...validBaseEnvironment,
-        MEDIA_STORAGE_PROVIDER: "r2",
-      }),
-    /CLOUDFLARE_ACCOUNT_ID.*is required when MEDIA_STORAGE_PROVIDER is 'r2'/,
-  );
-
-  assert.throws(
-    () =>
-      loadEnvironment({
-        ...validBaseEnvironment,
-        MEDIA_STORAGE_PROVIDER: "r2",
-        CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
-      }),
-    /R2_ACCESS_KEY_ID.*is required when MEDIA_STORAGE_PROVIDER is 'r2'/,
-  );
-
-  const validR2Cfg = loadEnvironment({
-    ...validBaseEnvironment,
-    MEDIA_STORAGE_PROVIDER: "r2",
-    CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
-    R2_ACCESS_KEY_ID: "test-access-key-id",
-    R2_SECRET_ACCESS_KEY: "test-secret-access-key",
-  });
-  assert.equal(validR2Cfg.mediaStorageProvider, "r2");
-  assert.equal(validR2Cfg.r2AccountId, "07e862129ce4083b383e85e2bf2ff0f8");
-  assert.equal(validR2Cfg.r2BucketName, "giftedpro-staging-media-downloads");
+test("media storage enforces mandatory Cloudflare R2 configuration in all environments and rejects simulator", () => {
+  // 1. Valid R2 configuration succeeds
+  const validCfg = loadEnvironment(validBaseEnvironment);
+  assert.equal(validCfg.r2AccountId, "07e862129ce4083b383e85e2bf2ff0f8");
+  assert.equal(validCfg.r2AccessKeyId, "test-r2-access-key-id");
+  assert.equal(validCfg.r2SecretAccessKey, "test-r2-secret-access-key");
+  assert.equal(validCfg.r2BucketName, "giftedpro-staging-media-downloads");
   assert.equal(
-    validR2Cfg.r2Endpoint,
+    validCfg.r2Endpoint,
     "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
+  );
+
+  // 2. Reject legacy MEDIA_STORAGE_PROVIDER setting
+  assert.throws(
+    () =>
+      loadEnvironment({
+        ...validBaseEnvironment,
+        MEDIA_STORAGE_PROVIDER: "simulator",
+      }),
+    /MEDIA_STORAGE_PROVIDER.*is no longer supported; Cloudflare R2 is the sole media storage provider/,
+  );
+
+  assert.throws(
+    () =>
+      loadEnvironment({
+        ...validBaseEnvironment,
+        MEDIA_STORAGE_PROVIDER: "r2",
+      }),
+    /MEDIA_STORAGE_PROVIDER.*is no longer supported; Cloudflare R2 is the sole media storage provider/,
+  );
+
+  // 3. Mandatory field validations (missing or empty) in non-production
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, CLOUDFLARE_ACCOUNT_ID: undefined }),
+    /CLOUDFLARE_ACCOUNT_ID.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, CLOUDFLARE_ACCOUNT_ID: "   " }),
+    /CLOUDFLARE_ACCOUNT_ID.*is required/,
+  );
+
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_ACCESS_KEY_ID: undefined }),
+    /R2_ACCESS_KEY_ID.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_ACCESS_KEY_ID: "" }),
+    /R2_ACCESS_KEY_ID.*is required/,
+  );
+
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_SECRET_ACCESS_KEY: undefined }),
+    /R2_SECRET_ACCESS_KEY.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_SECRET_ACCESS_KEY: "   " }),
+    /R2_SECRET_ACCESS_KEY.*is required/,
+  );
+
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_BUCKET_NAME: undefined }),
+    /R2_BUCKET_NAME.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_BUCKET_NAME: "  " }),
+    /R2_BUCKET_NAME.*is required/,
+  );
+
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_ENDPOINT: undefined }),
+    /R2_ENDPOINT.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_ENDPOINT: "" }),
+    /R2_ENDPOINT.*is required/,
+  );
+
+  // 4. Invalid endpoint format
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_ENDPOINT: "not-a-valid-url" }),
+    /R2_ENDPOINT.*must be a valid HTTP or HTTPS URL/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...validBaseEnvironment, R2_ENDPOINT: "ftp://storage.example.com" }),
+    /R2_ENDPOINT.*must be a valid HTTP or HTTPS URL/,
+  );
+
+  // 5. Production fail-fast when R2 configuration is missing or incomplete
+  const prodBase = {
+    ...validBaseEnvironment,
+    APP_ENV: "production",
+    CORS_ORIGINS: "https://giftedpromovies.com",
+    DB_POOL_MAX: "10",
+    EMAIL_OUTBOX_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    FRONTEND_URL: "https://giftedpromovies.com",
+    RESEND_API_KEY: "re_test_key_12345",
+    EMAIL_FROM: "notifications@giftedpromovies.com",
+    PLAYBACK_SIGNING_SECRET: "prod-playback-signing-secret-minimum-32-chars-long",
+  };
+
+  assert.throws(
+    () => loadEnvironment({ ...prodBase, CLOUDFLARE_ACCOUNT_ID: undefined }),
+    /CLOUDFLARE_ACCOUNT_ID.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...prodBase, R2_ACCESS_KEY_ID: undefined }),
+    /R2_ACCESS_KEY_ID.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...prodBase, R2_SECRET_ACCESS_KEY: undefined }),
+    /R2_SECRET_ACCESS_KEY.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...prodBase, R2_BUCKET_NAME: undefined }),
+    /R2_BUCKET_NAME.*is required/,
+  );
+  assert.throws(
+    () => loadEnvironment({ ...prodBase, R2_ENDPOINT: undefined }),
+    /R2_ENDPOINT.*is required/,
   );
 });
 

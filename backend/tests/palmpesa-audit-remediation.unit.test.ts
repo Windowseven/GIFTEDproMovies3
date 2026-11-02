@@ -27,6 +27,11 @@ test("PalmPesa Audit Remediation: Production Configuration & Fail-Closed Gates",
     EMAIL_FROM: "notifications@giftedpro.test",
     DB_POOL_MAX: "10",
     EMAIL_OUTBOX_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
+    R2_ACCESS_KEY_ID: "test-r2-access-key-id",
+    R2_SECRET_ACCESS_KEY: "test-r2-secret-access-key",
+    R2_BUCKET_NAME: "giftedpro-staging-media-downloads",
+    R2_ENDPOINT: "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
   };
 
   await t.test("Production: passes when all required PalmPesa production secrets are provided", () => {

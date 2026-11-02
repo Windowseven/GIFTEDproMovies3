@@ -12,6 +12,11 @@ const BASE_VALID_ENV: NodeJS.ProcessEnv = {
   EMAIL_FROM: "no-reply@giftedpromovies.com",
   EMAIL_PROVIDER: "resend",
   RESEND_API_KEY: "re_prod_test_key_12345",
+  CLOUDFLARE_ACCOUNT_ID: "07e862129ce4083b383e85e2bf2ff0f8",
+  R2_ACCESS_KEY_ID: "test-r2-access-key-id",
+  R2_SECRET_ACCESS_KEY: "test-r2-secret-access-key",
+  R2_BUCKET_NAME: "giftedpro-staging-media-downloads",
+  R2_ENDPOINT: "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
 };
 
 test("Production URL Safety — Missing or Empty FRONTEND_URL fails closed in production", () => {
@@ -155,6 +160,7 @@ test("Production URL Safety — Malicious schemes and control characters are neu
 test("Development & Test Environment Separation — Safe defaults in non-production", () => {
   // Development default
   const devConfig = loadEnvironment({
+    ...BASE_VALID_ENV,
     APP_ENV: "development",
     DATABASE_URL: "postgresql://tester:tester@127.0.0.1:5432/giftedpro_dev",
     EMAIL_OUTBOX_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -163,6 +169,7 @@ test("Development & Test Environment Separation — Safe defaults in non-product
 
   // Test default
   const testConfig = loadEnvironment({
+    ...BASE_VALID_ENV,
     APP_ENV: "test",
     DATABASE_URL: "postgresql://tester:tester@127.0.0.1:5432/giftedpro_test",
   });
@@ -269,15 +276,19 @@ test("Production Email Provider — in_memory is strictly rejected in production
 
 test("Development & Test Email Sender — Defaults to onboarding@resend.dev when unset", () => {
   const devConfig = loadEnvironment({
+    ...BASE_VALID_ENV,
     APP_ENV: "development",
     DATABASE_URL: "postgresql://tester:tester@127.0.0.1:5432/giftedpro_dev",
     EMAIL_OUTBOX_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    EMAIL_FROM: undefined,
   });
   assert.equal(devConfig.emailFrom, "onboarding@resend.dev");
 
   const testConfig = loadEnvironment({
+    ...BASE_VALID_ENV,
     APP_ENV: "test",
     DATABASE_URL: "postgresql://tester:tester@127.0.0.1:5432/giftedpro_test",
+    EMAIL_FROM: undefined,
   });
   assert.equal(testConfig.emailFrom, "onboarding@resend.dev");
 });

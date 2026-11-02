@@ -106,9 +106,13 @@ flowchart TD
    - `GPM-AUDIT-006` (Phase 8 Administrative & Operations Gate — VERIFIED; admin audit query endpoint active)
    - `GPM-AUDIT-005` (Phase 8 Event Decoupling Gate — VERIFIED; asynchronous in-process event bus active)
    - *Phase Exit Gates Reassessment:*
-     - **Phase 6 Exit Gate (Backend Software):** PASSED. Cloudflare Stream/R2 accepted (POD-02); staff preview (GPM-AUDIT-016) and media supersession (GPM-AUDIT-017) verified.
-     - **Phase 6 Operational Sandbox Gate:** BLOCKED / PENDING OPERATIONAL GATE. Live Cloudflare Stream/R2 sandbox upload-and-processing round-trip remains blocked pending operational cloud provisioning and credentials (evaluated in Phase 8).
-     - **Phase 7 Exit Gate (Backend):** PASSED. Customer streaming protection (GPM-AUDIT-011) and download quota enforcement (GPM-AUDIT-013) verified.
+     - **Phase 6 Exit Gate (Overall Status):** CLOSED (Formal Closure Date: 2026-11-02). Formally documented in `docs/qa/PHASE_6_OVERALL_CLOSURE_REPORT.md`. All mandatory acceptance criteria satisfied:
+       - **Backend Software Gate:** PASSED. Cloudflare Stream/R2 accepted (POD-02); staff preview (`GPM-AUDIT-016`) and media supersession (`GPM-AUDIT-017`) verified.
+       - **R2 Storage Hardening & Simulator Elimination:** PASSED. Local simulator adapter and registrations completely eliminated; 100% R2-only storage enforced (`tests/simulator-elimination-regression.test.ts` passed).
+       - **Operational Sandbox Gate:** PASSED. Live Cloudflare R2 staging media delivery verification executed against staging bucket `giftedpro-staging-media-downloads` (`backend/scripts/verify-e2e-media-delivery.mjs`), validating 28/28 scenarios (10 E2E functional, 17 security/adversarial, 1 cloud cleanup) with zero failures. Byte-for-byte SHA-256 integrity (`26faf6f2115af29f2ecaa2ffcff5fa185be9e27d35e00ac878c3187b961c4ddc`), 900s SigV4 presigned download TTL, HTTP 206 Range requests, delivery reporting, 24h retry grace, customer streaming lockout (503), staff preview RBAC/capability, and object cleanup verified.
+       - **Regression Suite:** PASSED. `pnpm run typecheck` (0 errors), `pnpm test` (36/36 test files passed, 0 failures).
+       - **Known Limitations Reconciled:** `docs/qa/R2_MEDIA_DELIVERY_KNOWN_LIMITATIONS.md` active (`getPlaybackUrl()` internal-only, customer streaming lockout HTTP 503, R2 hostname validation non-blocking backlog item).
+     - **Phase 7 Exit Gate (Stage 1 Backend):** ACCEPTED & CLOSED (Formal Acceptance Date: 2026-11-02, Ref: `GPM-PHASE7-STAGE1-FORMAL-ACCEPTANCE`). Formally documented in `docs/qa/PHASE_7_STAGE_1_IMPLEMENTATION_REPORT.md`, `docs/qa/PHASE_7_STAGE_1_SECURITY_REVIEW.md`, `docs/qa/PHASE_7_STAGE_1_TEST_EVIDENCE.md`, and `docs/decisions/POD-07_SUBSCRIPTION_BASED_DEVICE_LIMITS.md`. Customer device capacity enforcement per POD-07 / ADR-038 (`DEFAULT_CUSTOMER_DEVICE_LIMIT = 2`, active subscription `device_limit`, non-additive MAX, movie/content exclusion, non-eviction upon expiry, `pg_advisory_xact_lock(hashtext(userId))`, cascade session revocation; 16/16 tests passed in `tests/device-limits.integration.test.ts`), download history API (`GET /api/v1/download/history`), active download licenses API (`GET /api/v1/download/licenses`), and R2 download delivery reuse verified (19/19 tests passed in `tests/download-authorization.integration.test.ts`). Full repository regression passed 567/567 tests. Customer streaming remains strictly locked (503 `STREAMING_COMING_SOON`, Phase 8). Frontend download UI remains bounded for Stage 2 (NOT YET AUTHORIZED).
      - **Phase 8 Exit Gate (Operations):** BLOCKED ON HUMAN OPERATIONAL GATE. Backend code findings (005, 006) are verified, and operational runbook `docs/operations/BACKUP-RESTORE-DR-RUNBOOK.md` is active. However, physical disaster recovery drills, streaming WAL configuration, and empirical RPO/RTO verification require real production cloud infrastructure and credentials.
 3. **Tier 3: Functional Quality & Account Security Enhancements:**
    - `GPM-AUDIT-014` (Authenticated in-session password change)
@@ -185,8 +189,9 @@ flowchart TD
     - `MSS-10`: Direct raw SQL update on ready edition with active entitlement without supersession record is blocked by DB trigger with `DIRECT_SQL_MUTATION_DENIED`.
     - `MSS-11`: Customer role is rejected from `POST /media/supersede` with 403 Forbidden.
   - Phase 6 Exit Gate Status:
-    - **Backend Software Gate:** PASSED. Both GPM-AUDIT-016 and GPM-AUDIT-017 verified; Cloudflare Stream / R2 accepted per POD-02; Model B supersession active.
-    - **Operational Sandbox Gate:** BLOCKED / PENDING OPERATIONAL GATE. Real Cloudflare Stream/R2 sandbox upload-and-processing round-trip is pending staging cloud credentials and infrastructure.
+    - **Overall Status:** CLOSED (2026-11-02). Formally documented in `docs/qa/PHASE_6_OVERALL_CLOSURE_REPORT.md`.
+    - **Backend Software Gate:** PASSED. Both GPM-AUDIT-016 and GPM-AUDIT-017 verified; Cloudflare Stream / R2 accepted per POD-02; Model B supersession active; 100% R2-only storage enforced with local simulator completely removed.
+    - **Operational Sandbox Gate:** PASSED. Live Cloudflare R2 staging media delivery verification verified 28/28 scenarios with zero failures (`backend/scripts/verify-e2e-media-delivery.mjs`).
 
 ---
 
@@ -422,7 +427,12 @@ flowchart TD
     - `DLA-11`: 24-hour retry grace window permits re-download of failed attempt without consuming additional quota (`isRetry: true`, attempt number incremented to 2, status reset to `PENDING`).
     - `DLA-12`: Customer reports delivery completion (`POST /api/v1/download/report-delivery` with status `'COMPLETED'`) -> 200 OK, `completedAt` timestamp persisted in DB.
     - `DLA-13`: Concurrent download requests for distinct titles under `limit = 1` serialize via order row lock: exactly one succeeds (200), one fails with 403 `DOWNLOAD_QUOTA_EXHAUSTED`.
-  - Phase 7 Exit Gate Status: PASSED (Backend). Both GPM-AUDIT-011 and GPM-AUDIT-013 verified with full quota enforcement and concurrency protection.
+    - `DLA-14`: Paginated download history (`GET /api/v1/download/history`) with metadata resolution and real-time quota projection (200 OK).
+    - `DLA-15`: Download history status filtering (`COMPLETED`, `PENDING`, `FAILED`) verified (200 OK).
+    - `DLA-16`: Customer isolation and IDOR protection on download history (200 OK, empty array for non-entitled customer).
+    - `DLA-17`: Active download licenses (`GET /api/v1/download/licenses`) with `quotaRemaining` and `hasCompletedDownload` verified (200 OK).
+    - `DLA-18`: Download licenses API excludes plans with `download_limit = 0` (200 OK).
+  - Phase 7 Exit Gate Status: PASSED (Stage 1 Backend). Customer device limits, download history API, active download licenses API, download quota enforcement, and R2 delivery workflow reuse verified. Customer streaming remains locked (HTTP 503, Phase 8). Frontend customer download UI remains bounded for Stage 2.
 
 ---
 
@@ -455,7 +465,7 @@ flowchart TD
     - `SMP-08`: Structured audit log verified in `audit_events` with `action = 'STAFF_MEDIA_PREVIEW_GENERATED'` and metadata `{ ttlSeconds: 300 }`.
   - Regression Suites Verified:
     - `phase5-commerce-to-streaming.integration.test.js`: 14/14 passed.
-  - Phase 6 Exit Gate Alignment: Backend software requirements verified (SMP-01 through SMP-08); operational live sandbox round-trip remains pending operational gate.
+  - Phase 6 Exit Gate Alignment: Backend software requirements verified (SMP-01 through SMP-08); operational live sandbox round-trip verified on Cloudflare R2 staging with 300s preview TTL and RBAC/capability enforcement (`SEC-15` through `SEC-17` in `backend/scripts/verify-e2e-media-delivery.mjs`).
 
 ---
 

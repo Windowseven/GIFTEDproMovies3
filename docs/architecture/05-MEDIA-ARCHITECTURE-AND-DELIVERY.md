@@ -72,9 +72,9 @@ Download authorization is distinct from streaming. Per Product Owner Approval PO
 
 Upload interruption, duplicate completion, processing delay, callback loss, provider outage, expired authorization, and corrupted metadata are explicit operational cases. Retriable operations are idempotent and bounded; a reconciliation process can compare local state with provider state. Cleanup may delete abandoned objects only after a defined retention and reference check. Cleanup window and deletion semantics remain operational policy.
 
-Keep domain contracts expressed in terms of asset identity, state, and authorized playback capability. Domain port adapters (`LocalSimulatorMediaAdapter` for development/testing and Cloudflare adapters for production) translate provider APIs, identifiers, webhook signatures, and URL formats. Replacing a vendor may require reprocessing/migration of media, but does not rewrite catalog, payment, or entitlement semantics.
+Keep domain contracts expressed in terms of asset identity, state, and authorized playback capability. Cloudflare R2 is the sole media storage provider (`R2MediaStorageAdapter`); simulation-based storage adapters have been completely eliminated by Product Owner directive. Port adapters translate provider APIs, identifiers, webhook signatures, and URL formats. Replacing a vendor may require reprocessing/migration of media, but does not rewrite catalog, payment, or entitlement semantics.
 
-Cloudflare Stream and Cloudflare R2 are **ACCEPTED** (ADR-010, ADR-011). Local and automated testing executes against provider-agnostic adapters (`LocalSimulatorMediaAdapter`, `JwtPlaybackSignerAdapter`). Real Cloudflare Stream/R2 staging and production round-trip execution is an operational gate that remains pending cloud infrastructure provisioning in Phase 8.
+Cloudflare Stream and Cloudflare R2 are **ACCEPTED** (ADR-010, ADR-011). Cloudflare R2 serves all customer downloads directly via short-lived (900s) S3 SigV4 presigned URLs. Local and automated testing executes against `R2MediaStorageAdapter` with mocked S3 client SDKs or isolated test configurations. Real Cloudflare R2 staging verification was completed in Phase 6.B; Cloudflare Stream customer playback remains disabled (`CUSTOMER_STREAMING_ENABLED=false`) pending operational verification and release approval.
 
 ## Related documents
 

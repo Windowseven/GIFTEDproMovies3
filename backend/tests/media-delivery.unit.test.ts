@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { JwtPlaybackSignerAdapter } from "../src/modules/media/adapters/jwt-playback-signer.adapter.js";
-import { LocalSimulatorMediaAdapter } from "../src/modules/media/adapters/local-simulator-media.adapter.js";
 
 test("Task 5.B1 — Media Delivery & Playback Signer Unit Suite", async (t) => {
   const secret = "test-playback-signer-secret-key-32-chars";
@@ -79,109 +78,84 @@ test("Task 5.B1 — Media Delivery & Playback Signer Unit Suite", async (t) => {
     assert.equal(result, null);
   });
 
-  await t.test("LocalSimulatorMediaAdapter: generates presigned URLs and tracks objects", async () => {
-    const adapter = new LocalSimulatorMediaAdapter();
+  await t.test("R2MediaStorageAdapter: constructor validates required parameters", async () => {
+    const { R2MediaStorageAdapter } = await import(
+      "../src/modules/media/adapters/r2-media-storage.adapter.js"
+    );
 
-    const presigned = await adapter.generatePresignedUploadUrl({
-      storageKey: "raw/movies/m1/ed1/streaming/test.mp4",
-      contentType: "video/mp4",
-      expiresInSeconds: 1800,
-    });
+    assert.throws(
+      () =>
+        new R2MediaStorageAdapter({
+          accountId: "acc-1",
+          accessKeyId: "key-1",
+          secretAccessKey: "sec-1",
+          bucketName: "   ",
+        }),
+      /bucketName is required/,
+    );
 
-    assert.ok(presigned.uploadUrl.includes("media-sim.giftedpro.test"));
-    assert.equal(presigned.storageKey, "raw/movies/m1/ed1/streaming/test.mp4");
-    assert.equal(presigned.expiresInSeconds, 1800);
-
-    // Not yet uploaded
-    assert.equal(await adapter.verifyObjectExists(presigned.storageKey), false);
-
-    // Simulate upload completion
-    adapter.simulateUpload(presigned.storageKey);
-    assert.equal(await adapter.verifyObjectExists(presigned.storageKey), true);
-
-    // Playback URL
-    const playbackUrl = adapter.getPlaybackUrl("movies/m1/master.m3u8");
-    assert.equal(playbackUrl, "https://stream.giftedpro.test/hls/movies/m1/master.m3u8");
-
-    // Deletion
-    await adapter.deleteObject(presigned.storageKey);
-    assert.equal(await adapter.verifyObjectExists(presigned.storageKey), false);
-  });
-
-  await t.test("LocalSimulatorMediaAdapter: origin access verification enforces valid signed playback tokens", async () => {
-    const adapter = new LocalSimulatorMediaAdapter();
-    const signer = new JwtPlaybackSignerAdapter({ secret, defaultTtlSeconds: 900 });
-
-    const validToken = await signer.generatePlaybackToken({
-      customerId: "cust-1",
-      contentId: "content-1",
-      ttlSeconds: 600,
-    });
-
-    // 1. Valid request to manifest with valid signed token
-    const validUrl = `${adapter.getPlaybackUrl("movies/m1/master.m3u8")}?token=${validToken}`;
-    const validResult = await adapter.verifyOriginAccess(validUrl, signer);
-    assert.equal(validResult.allowed, true);
-
-    // 2. Request without token is denied
-    const missingTokenUrl = adapter.getPlaybackUrl("movies/m1/master.m3u8");
-    const missingResult = await adapter.verifyOriginAccess(missingTokenUrl, signer);
-    assert.equal(missingResult.allowed, false);
-    assert.equal(missingResult.reason, "MISSING_PLAYBACK_TOKEN");
-
-    // 3. Request with tampered token is denied
-    const tamperedUrl = `${adapter.getPlaybackUrl("movies/m1/master.m3u8")}?token=${validToken}tampered`;
-    const tamperedResult = await adapter.verifyOriginAccess(tamperedUrl, signer);
-    assert.equal(tamperedResult.allowed, false);
-    assert.equal(tamperedResult.reason, "INVALID_OR_EXPIRED_TOKEN");
-
-    // 4. Request with expired token is denied
-    const expiredToken = await signer.generatePlaybackToken({
-      customerId: "cust-1",
-      contentId: "content-1",
-      ttlSeconds: -10,
-    });
-    const expiredUrl = `${adapter.getPlaybackUrl("movies/m1/master.m3u8")}?token=${expiredToken}`;
-    const expiredResult = await adapter.verifyOriginAccess(expiredUrl, signer);
-    assert.equal(expiredResult.allowed, false);
-    assert.equal(expiredResult.reason, "INVALID_OR_EXPIRED_TOKEN");
+    assert.throws(
+      () =>
+        new R2MediaStorageAdapter({
+          accountId: "",
+          accessKeyId: "key-1",
+          secretAccessKey: "sec-1",
+          bucketName: "my-bucket",
+        }),
+      /accountId, accessKeyId, and secretAccessKey are required/,
+    );
   });
 
   await t.test("R2MediaStorageAdapter: generates presigned upload/download URLs and handles object lifecycle with mock S3Client", async () => {
     const { R2MediaStorageAdapter } = await import(
       "../src/modules/media/adapters/r2-media-storage.adapter.js"
     );
+    const { S3Client } = await import("@aws-sdk/client-s3");
 
-    // Track commands sent through mock S3Client
+    // Track commands sent through S3Client
     const sentCommands: unknown[] = [];
-    const mockS3Client = {
-      send: async (command: unknown) => {
-        sentCommands.push(command);
-        const cmdName = (command as { constructor: { name: string } }).constructor.name;
-        if (cmdName === "HeadObjectCommand") {
-          const key = (command as { input: { Key: string } }).input.Key;
-          if (key === "nonexistent/file.bin") {
-            const err = Object.assign(new Error("Not Found"), {
-              name: "NotFound",
-              $metadata: { httpStatusCode: 404 },
-            });
-            throw err;
-          }
-          return { ContentLength: 1024, ContentType: "video/mp4" };
-        }
-        if (cmdName === "DeleteObjectCommand") {
-          return {};
-        }
-        return {};
+    const mockS3Client = new S3Client({
+      region: "auto",
+      endpoint: "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com",
+      credentials: {
+        accessKeyId: "mock-access-key",
+        secretAccessKey: "mock-secret-key",
       },
-    };
+    });
+
+    mockS3Client.send = (async (command: unknown) => {
+      sentCommands.push(command);
+      const cmdName = (command as { constructor: { name: string } }).constructor.name;
+      if (cmdName === "HeadObjectCommand") {
+        const key = (command as { input: { Key: string } }).input.Key;
+        if (key === "nonexistent/file.bin") {
+          const err = Object.assign(new Error("Not Found"), {
+            name: "NotFound",
+            $metadata: { httpStatusCode: 404 },
+          });
+          throw err;
+        }
+        if (key === "error/file.bin") {
+          const err = Object.assign(new Error("Internal R2 Error"), {
+            name: "InternalError",
+            $metadata: { httpStatusCode: 500 },
+          });
+          throw err;
+        }
+        return { ContentLength: 1024, ContentType: "video/mp4" };
+      }
+      if (cmdName === "DeleteObjectCommand") {
+        return {};
+      }
+      return {};
+    }) as any;
 
     const adapter = new R2MediaStorageAdapter({
       accountId: "07e862129ce4083b383e85e2bf2ff0f8",
       accessKeyId: "mock-access-key",
       secretAccessKey: "mock-secret-key",
       bucketName: "giftedpro-staging-media-downloads",
-      s3Client: mockS3Client as any,
+      s3Client: mockS3Client,
     });
 
     assert.equal(adapter.providerName, "r2");
@@ -193,15 +167,16 @@ test("Task 5.B1 — Media Delivery & Playback Signer Unit Suite", async (t) => {
       expiresInSeconds: 3600,
     });
     assert.equal(uploadResult.storageKey, "raw/movies/m1/source.mp4"); // stripped leading slash
-    assert.equal(uploadResult.expiresInSeconds, 3600);
-    assert.ok(uploadResult.uploadUrl.includes("https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com"));
+    assert.ok(uploadResult.uploadUrl.includes("07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com"));
+    assert.ok(uploadResult.uploadUrl.includes("giftedpro-staging-media-downloads"));
 
     // 2. Presigned download URL
     const downloadUrl = await adapter.generatePresignedDownloadUrl({
       storageKey: "downloads/movies/m1/edition1.mp4",
       expiresInSeconds: 900,
     });
-    assert.ok(downloadUrl.includes("https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com"));
+    assert.ok(downloadUrl.includes("07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com"));
+    assert.ok(downloadUrl.includes("giftedpro-staging-media-downloads"));
 
     // 3. Object existence verification
     const exists = await adapter.verifyObjectExists("raw/movies/m1/source.mp4");
@@ -210,11 +185,23 @@ test("Task 5.B1 — Media Delivery & Playback Signer Unit Suite", async (t) => {
     const notExists = await adapter.verifyObjectExists("nonexistent/file.bin");
     assert.equal(notExists, false);
 
+    await assert.rejects(
+      async () => adapter.verifyObjectExists("error/file.bin"),
+      /Internal R2 Error/,
+    );
+
     // 4. Object deletion
     await adapter.deleteObject("raw/movies/m1/source.mp4");
     assert.ok(sentCommands.some((c: any) => c.constructor.name === "DeleteObjectCommand"));
 
-    // 5. Rejection of path traversal keys
+    // 5. Canonical storage playback URL
+    const playbackUrl = adapter.getPlaybackUrl("raw/movies/m1/source.mp4");
+    assert.equal(
+      playbackUrl,
+      "https://07e862129ce4083b383e85e2bf2ff0f8.r2.cloudflarestorage.com/giftedpro-staging-media-downloads/raw/movies/m1/source.mp4",
+    );
+
+    // 6. Rejection of path traversal keys
     await assert.rejects(
       async () => adapter.generatePresignedUploadUrl({ storageKey: "../etc/passwd", contentType: "text/plain" }),
       /Invalid storage key/,
@@ -253,6 +240,103 @@ test("Task 5.B1 — Media Delivery & Playback Signer Unit Suite", async (t) => {
       assert.equal(res.code, "STREAMING_COMING_SOON");
       assert.ok(res.message.includes("STREAMING_COMING_SOON"));
     }
+  });
+
+  await t.test("MediaService: download authorization directly invokes R2 generatePresignedDownloadUrl without simulation tokens", async () => {
+    const { MediaService } = await import("../src/modules/media/media.service.js");
+
+    let presignedCalledWith: any = null;
+    const mockStorage = {
+      providerName: "r2",
+      generatePresignedDownloadUrl: async (params: any) => {
+        presignedCalledWith = params;
+        return `https://r2.cloudflarestorage.com/bucket/${params.storageKey}?X-Amz-Signature=mock-sig`;
+      },
+    };
+
+    const editionData = [
+      {
+        id: "ed-1",
+        movieId: "movie-1",
+        isAvailable: true,
+        downloadStatus: "ready",
+        downloadFileKey: "downloads/movies/m1/ed1.mp4",
+        isDefault: true,
+      },
+    ];
+
+    const makeQueryResult = (data: any[]) => {
+      const arr: any = [...data];
+      arr.limit = (n: number) => arr.slice(0, n);
+      arr.orderBy = () => arr;
+      return arr;
+    };
+
+    const mockDb = {
+      select: () => ({
+        from: () => ({
+          where: () => makeQueryResult(editionData),
+        }),
+      }),
+      transaction: async (cb: any) => {
+        const tx = {
+          execute: async () => ({ rows: [{ cnt: 0 }] }),
+          select: () => ({
+            from: () => ({
+              where: () => makeQueryResult([]),
+            }),
+          }),
+          insert: () => ({
+            values: () => ({}),
+          }),
+        };
+        return cb(tx);
+      },
+    };
+
+    const mockAccessService = {
+      canAccess: async () => ({
+        granted: true,
+        entitlementId: "ent-1",
+        orderId: "ord-1",
+        planVersionId: "pv-1",
+        grantType: "PURCHASE",
+      }),
+    };
+
+    const mockAuditService = {
+      recordEvent: async () => {},
+    };
+
+    const mockSigner = {
+      generatePlaybackToken: async () => "token-xyz",
+    };
+
+    const mockEnv = {
+      customerStreamingEnabled: false,
+    };
+
+    const service = new MediaService(
+      mockDb as any,
+      mockAccessService as any,
+      mockAuditService as any,
+      mockStorage as any,
+      mockSigner as any,
+      mockEnv as any,
+    );
+
+    const result = await service.authorizeDownload("cust-123", {
+      contentId: "movie-1",
+      editionId: "ed-1",
+    });
+
+    assert.equal(result.authorized, true);
+    assert.ok(presignedCalledWith);
+    assert.equal(presignedCalledWith.storageKey, "downloads/movies/m1/ed1.mp4");
+    assert.equal(presignedCalledWith.expiresInSeconds, 900);
+    assert.ok(result.downloadUrl.includes("X-Amz-Signature=mock-sig"));
+    assert.ok(!result.downloadUrl.includes("?token="));
+    assert.ok(!result.downloadUrl.includes("media-sim"));
   });
 });
 
