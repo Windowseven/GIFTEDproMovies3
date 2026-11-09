@@ -63,6 +63,7 @@ export interface RecordAuditEventInput {
   metadata?: Record<string, unknown> | null;
   ipAddress?: string | null;
   userAgent?: string | null;
+  requestId?: string | null;
   failClosed?: boolean;
   tx?: DatabaseClient;
 }
@@ -80,8 +81,15 @@ export class AuditService {
    * Strips all secrets from metadata before persistence.
    */
   async recordEvent(input: RecordAuditEventInput): Promise<void> {
-    const sanitizedMeta = input.metadata
-      ? (sanitizeMetadata(input.metadata) as Record<string, unknown>)
+    const rawMetadata: Record<string, unknown> | null = input.metadata || input.requestId
+      ? {
+          ...(input.metadata ?? {}),
+          ...(input.requestId ? { requestId: input.requestId } : {}),
+        }
+      : null;
+
+    const sanitizedMeta = rawMetadata
+      ? (sanitizeMetadata(rawMetadata) as Record<string, unknown>)
       : null;
 
     const client = input.tx ?? this.db;

@@ -48,7 +48,7 @@ export function CountryRail({ countries }: CountryRailProps) {
                   {country.name}
                 </h4>
                 <p className="text-[10px] font-mono text-gray-500 truncate">
-                  {country.contentCount} movies
+                  {country.contentCount && country.contentCount > 0 ? `${country.contentCount} movies` : 'Cinema'}
                 </p>
               </div>
             </Link>

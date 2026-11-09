@@ -22,6 +22,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 import { AuthProvider } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import { CustomerProvider } from "@/context/CustomerContext";
 
 export const metadata: Metadata = {
@@ -50,7 +51,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#08090C] text-[#F5F5F5] font-sans selection:bg-[#E50914] selection:text-white">
         <AuthProvider>
-          <CustomerProvider>{children}</CustomerProvider>
+          <NotificationProvider>
+            <CustomerProvider>{children}</CustomerProvider>
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>

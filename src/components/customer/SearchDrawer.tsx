@@ -16,8 +16,9 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
-import { searchCustomerCatalog } from '@/data/mock/customerData';
-import { SearchResultGroup } from '@/types/customer';
+import { catalogApi } from '@/lib/api/catalogApi';
+import { adminRepository } from '@/lib/repositories/adminRepository';
+import { SearchResultGroup, MovieItem, DjItem, CategoryItem } from '@/types/customer';
 
 const QUICK_FILTERS = ['All', 'Action', 'DJ Murphy', 'DJ Afro Amigo', 'Tanzania', 'Thriller'];
 
@@ -48,8 +49,95 @@ export function SearchDrawer() {
       setResults({ movies: [], series: [], djs: [], categories: [] });
       return;
     }
-    const res = searchCustomerCatalog(query);
-    setResults(res);
+
+    const timer = setTimeout(async () => {
+      try {
+        const [searchRes, allDjs, allCats] = await Promise.all([
+          catalogApi.searchTitles(query.trim(), 10).catch(() => ({ items: [] })),
+          adminRepository.getDJs().catch(() => []),
+          adminRepository.getCategories().catch(() => []),
+        ]);
+
+                const mappedMovies: MovieItem[] = (searchRes.items || []).map((t) => ({
+          id: t.id,
+          title: t.title,
+          originalTitle: t.originalTitle || t.title,
+          slug: t.slug,
+          releaseYear: t.releaseYear,
+          durationMinutes: t.durationMinutes,
+          rating: 8.5,
+          posterUrl: t.posterUrl || '/images/placeholders/movie_card_empty.svg',
+          backdropUrl: t.backdropUrl || '/images/placeholders/movie_card_empty.svg',
+          description: t.description || 'Swahili Translated Movie',
+          genres: (t.categories || []).map((c) => c.name),
+          countries: (t.countries || []).map((c) => c.name),
+          ageRating: '16+',
+          streamingStatus: 'streaming_ready',
+          downloadStatus: 'download_ready',
+          status: 'published',
+          isFeatured: false,
+          isTrending: false,
+          viewsCount: 0,
+          purchasesCount: 0,
+          downloadsCount: 0,
+          publishedAt: t.publishedAt || new Date().toISOString(),
+          versions: [
+            {
+              id: 'v-' + t.id,
+              djId: 'dj-murphy',
+              djName: 'DJ Murphy',
+              streamingPriceTsh: 1500,
+              downloadPriceTsh: 2500,
+              accessDurationHours: 48,
+              streamingStatus: 'streaming_ready',
+              downloadStatus: 'download_ready',
+              isDefault: true,
+            },
+          ],
+        }));
+
+        const qLower = query.toLowerCase();
+                const matchedDjs: DjItem[] = allDjs
+          .filter((d) => (d.name || d.stageName || '').toLowerCase().includes(qLower))
+          .map((d) => ({
+            id: d.id,
+            name: d.name || d.stageName,
+            stageName: d.stageName || d.name,
+            slug: d.slug,
+            avatarUrl: d.avatarUrl || '/images/placeholders/movie_card_empty.svg',
+            bio: d.bio || 'Professional commentary master',
+            activeTitlesCount: d.activeTitlesCount || 0,
+            tier: d.tier || 'Master Commentator',
+            contractType: d.contractType || 'Exclusive',
+            totalStreams: d.totalStreams || 0,
+            status: d.status || 'active',
+            colorHex: d.colorHex || '#E50914',
+          }));
+
+                const matchedCats: CategoryItem[] = allCats
+          .filter((c) => c.name.toLowerCase().includes(qLower))
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            description: c.description || '',
+            displayOrder: c.displayOrder || 0,
+            contentCount: c.contentCount || 0,
+            isActive: c.isActive !== false,
+          }));
+
+        setResults({
+          movies: mappedMovies,
+          series: [],
+          djs: matchedDjs,
+          categories: matchedCats,
+        });
+      } catch (err) {
+        console.error('Search drawer error:', err);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
   if (!isSearchOpen) return null;
@@ -212,13 +300,13 @@ export function SearchDrawer() {
                           {movie.title}
                         </h5>
                         <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-                          {movie.releaseYear} • {movie.genres.join(', ')} • {movie.availableDjs?.[0] || 'Swahili Dub'}
+                          {movie.releaseYear} • {movie.genres.join(', ')} • {movie.versions?.[0]?.djName || 'Swahili Dub'}
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <span className="text-xs font-mono text-emerald-400 font-bold">
-                        TSh {(movie.streamPriceTsh || 1500).toLocaleString()}
+                        TSh {(movie.versions?.[0]?.streamingPriceTsh || 1500).toLocaleString()}
                       </span>
                     </div>
                   </Link>

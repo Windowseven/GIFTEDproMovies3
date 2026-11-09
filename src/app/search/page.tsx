@@ -8,8 +8,11 @@ import { MovieCard } from '@/components/customer/MovieCard';
 import { TrailerModal } from '@/components/customer/TrailerModal';
 import { LipaModal } from '@/components/customer/LipaModal';
 import { SearchDrawer } from '@/components/customer/SearchDrawer';
-import { customerMovies, customerCategories, customerDjs } from '@/data/mock/customerData';
-import { Search, Film, X, Filter } from 'lucide-react';
+import { adminRepository } from '@/lib/repositories/adminRepository';
+import { catalogApi } from '@/lib/api/catalogApi';
+import { MovieItem, CategoryItem } from '@/types/customer';
+import { CustomerTitleCard } from '@/lib/api/types';
+import { Search, Film, X } from 'lucide-react';
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -17,26 +20,86 @@ function SearchContent() {
   const [query, setQuery] = useState(initialQuery);
   const [selectedGenre, setSelectedGenre] = useState('All');
   const [selectedDj, setSelectedDj] = useState('All');
+  const [moviesList, setMoviesList] = useState<MovieItem[]>([]);
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (initialQuery) {
-      setQuery(initialQuery);
+    adminRepository.getCategories().then(cats => setCategoriesList(cats || []));
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+    async function performSearch() {
+      setIsLoading(true);
+      try {
+        if (query.trim()) {
+          const res = await catalogApi.searchTitles(query.trim());
+          if (!isCancelled) {
+            const mapped: MovieItem[] = (res.items || []).map((t: CustomerTitleCard) => ({
+              id: t.id,
+              title: t.title,
+              originalTitle: t.originalTitle || t.title,
+              slug: t.slug,
+              releaseYear: t.releaseYear || 2024,
+              durationMinutes: t.durationMinutes || 120,
+              posterUrl: t.posterUrl || 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&auto=format&fit=crop&q=80',
+              backdropUrl: t.backdropUrl || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
+              trailerUrl: t.trailerUrl || undefined,
+              description: t.description || 'African cinematic release.',
+              genres: t.categories ? t.categories.map((c) => c.name) : [],
+              countries: t.countries ? t.countries.map((c) => c.name) : [],
+              ageRating: '16+',
+              rating: 8.5,
+              streamingStatus: 'streaming_ready',
+              downloadStatus: 'download_ready',
+              status: 'published',
+              isFeatured: false,
+              isTrending: false,
+              viewsCount: 0,
+              purchasesCount: 0,
+              downloadsCount: 0,
+              publishedAt: t.publishedAt || new Date().toISOString(),
+              versions: [
+                {
+                  id: 'v-' + t.id,
+                  djId: 'dj-murphy',
+                  djName: 'DJ Murphy',
+                  streamingPriceTsh: 1500,
+                  downloadPriceTsh: 2500,
+                  accessDurationHours: 48,
+                  streamingStatus: 'streaming_ready',
+                  downloadStatus: 'download_ready',
+                  isDefault: true,
+                },
+              ],
+            }));
+            setMoviesList(mapped);
+          }
+        } else {
+          const allMovies = await adminRepository.getMovies();
+          if (!isCancelled) {
+            setMoviesList(allMovies || []);
+          }
+        }
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
     }
-  }, [initialQuery]);
 
-  const filteredMovies = customerMovies.filter((movie) => {
-    const cleanQuery = query.toLowerCase().trim();
-    const matchesQuery =
-      !cleanQuery ||
-      movie.title.toLowerCase().includes(cleanQuery) ||
-      movie.description.toLowerCase().includes(cleanQuery) ||
-      (movie.availableDjs && movie.availableDjs.some((dj) => dj.toLowerCase().includes(cleanQuery))) ||
-      movie.genres.some((g) => g.toLowerCase().includes(cleanQuery));
+    const timer = setTimeout(performSearch, 250);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
+  const filteredMovies = moviesList.filter((movie) => {
     const matchesGenre = selectedGenre === 'All' || movie.genres.includes(selectedGenre);
     const matchesDj = selectedDj === 'All' || (movie.availableDjs && movie.availableDjs.includes(selectedDj));
-
-    return matchesQuery && matchesGenre && matchesDj;
+    return matchesGenre && matchesDj;
   });
 
   return (
@@ -74,7 +137,7 @@ function SearchContent() {
           >
             All Genres
           </button>
-          {customerCategories.slice(0, 6).map((cat) => (
+          {categoriesList.slice(0, 6).map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedGenre(cat.name)}

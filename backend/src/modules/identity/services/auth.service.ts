@@ -284,6 +284,7 @@ export class AuthService {
     deviceMeta?: DeviceMetadataInput | null,
     ipAddress?: string | null,
     userAgent?: string | null,
+    requestId?: string | null,
   ): Promise<{ user: SafeUser; session: SessionRecord; rawToken: string }> {
     const normalizedEmail = email.toLowerCase().trim();
     const [user] = await this.db
@@ -299,8 +300,12 @@ export class AuthService {
         metadata: { email: normalizedEmail, reason: "user_not_found" },
         ipAddress,
         userAgent,
+        requestId,
       });
-      throw new UnauthorizedException("Invalid email or password");
+      throw new UnauthorizedException({
+        code: "AUTHENTICATION_FAILED",
+        message: "Unable to sign in with the provided credentials. Please check your details and try again.",
+      });
     }
 
     if (!user.passwordHash) {
@@ -312,8 +317,12 @@ export class AuthService {
         metadata: { reason: "password_not_set" },
         ipAddress,
         userAgent,
+        requestId,
       });
-      throw new UnauthorizedException("Invalid email or password");
+      throw new UnauthorizedException({
+        code: "AUTHENTICATION_FAILED",
+        message: "Unable to sign in with the provided credentials. Please check your details and try again.",
+      });
     }
 
     const isValidPassword = await this.passwordHasher.verifyPassword(
@@ -330,8 +339,12 @@ export class AuthService {
         metadata: { reason: "invalid_password" },
         ipAddress,
         userAgent,
+        requestId,
       });
-      throw new UnauthorizedException("Invalid email or password");
+      throw new UnauthorizedException({
+        code: "AUTHENTICATION_FAILED",
+        message: "Unable to sign in with the provided credentials. Please check your details and try again.",
+      });
     }
 
     // Central account status enforcement
@@ -344,6 +357,7 @@ export class AuthService {
         metadata: { status: "suspended" },
         ipAddress,
         userAgent,
+        requestId,
       });
       throw new ForbiddenException("ACCOUNT_SUSPENDED: Your account has been suspended");
     }
@@ -357,6 +371,7 @@ export class AuthService {
         metadata: { status: "deactivated" },
         ipAddress,
         userAgent,
+        requestId,
       });
       throw new ForbiddenException("ACCOUNT_DEACTIVATED: Your account has been deactivated");
     }
@@ -387,6 +402,7 @@ export class AuthService {
       metadata: { deviceId },
       ipAddress,
       userAgent,
+      requestId,
     });
 
     return { user: sanitizeUser(user), session, rawToken };

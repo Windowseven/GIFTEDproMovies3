@@ -13,6 +13,9 @@
 *.pfx
 secrets/
 .google-e2e-session.json
+*.local-test-credentials.json
+.local-test-credentials.json
+
 
 # Dependency Directories (Runtime-neutral)
 node_modules/

@@ -47,7 +47,7 @@ export function CategoryRail({ categories }: CategoryRailProps) {
                   <Film className="w-4 h-4" />
                 </span>
                 <span className="text-[10px] font-mono text-gray-500 font-bold">
-                  {cat.contentCount} titles
+                  {cat.contentCount && cat.contentCount > 0 ? `${cat.contentCount} titles` : 'Curated'}
                 </span>
               </div>
 

@@ -113,6 +113,7 @@ export class AuthController {
       deviceMeta,
       ipAddress,
       userAgent,
+      request.id,
     );
 
     reply.setCookie(COOKIE_NAME, rawToken, {

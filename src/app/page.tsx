@@ -5,6 +5,7 @@ import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { CustomerFooter } from '@/components/customer/CustomerFooter';
 import { HeroBillboard } from '@/components/customer/HeroBillboard';
 import { ContentRail } from '@/components/customer/ContentRail';
+import { CuratedSpotlightDeck } from '@/components/customer/CuratedSpotlightDeck';
 import { CategoryRail } from '@/components/customer/CategoryRail';
 import { CountryRail } from '@/components/customer/CountryRail';
 import { DjSpotlightRail } from '@/components/customer/DjSpotlightRail';
@@ -12,15 +13,6 @@ import { VipPassPromoBanner } from '@/components/customer/VipPassPromoBanner';
 import { TrailerModal } from '@/components/customer/TrailerModal';
 import { LipaModal } from '@/components/customer/LipaModal';
 import { SearchDrawer } from '@/components/customer/SearchDrawer';
-import {
-  billboardMovies,
-  trendingMovies,
-  newReleases,
-  popularMovies,
-  customerCategories,
-  customerCountries,
-  customerDjs,
-} from '@/data/mock/customerData';
 import { adminRepository } from '@/lib/repositories/adminRepository';
 import { MovieItem, CategoryItem, CountryItem, DjItem } from '@/types/customer';
 import { useCustomer } from '@/context/CustomerContext';
@@ -30,13 +22,13 @@ import Link from 'next/link';
 export default function CustomerHomePage() {
   const { isAuthenticated, continueWatching } = useCustomer();
 
-  const [heroList, setHeroList] = useState<MovieItem[]>(billboardMovies);
-  const [releasesList, setReleasesList] = useState<MovieItem[]>(newReleases);
-  const [trendingList, setTrendingList] = useState<MovieItem[]>(trendingMovies);
-  const [popularList, setPopularList] = useState<MovieItem[]>(popularMovies);
-  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(customerCategories);
-  const [countriesList, setCountriesList] = useState<CountryItem[]>(customerCountries);
-  const [djsList, setDjsList] = useState<DjItem[]>(customerDjs);
+  const [heroList, setHeroList] = useState<MovieItem[]>([]);
+  const [releasesList, setReleasesList] = useState<MovieItem[]>([]);
+  const [trendingList, setTrendingList] = useState<MovieItem[]>([]);
+  const [popularList, setPopularList] = useState<MovieItem[]>([]);
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>([]);
+  const [countriesList, setCountriesList] = useState<CountryItem[]>([]);
+  const [djsList, setDjsList] = useState<DjItem[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -50,13 +42,13 @@ export default function CustomerHomePage() {
         adminRepository.getDJs(),
       ]);
 
-      if (hero && hero.length > 0) setHeroList(hero);
-      if (releases && releases.length > 0) setReleasesList(releases);
-      if (trending && trending.length > 0) setTrendingList(trending);
-      if (popular && popular.length > 0) setPopularList(popular);
-      if (cats && cats.length > 0) setCategoriesList(cats);
-      if (countries && countries.length > 0) setCountriesList(countries);
-      if (djs && djs.length > 0) setDjsList(djs);
+      setHeroList(hero || []);
+      setReleasesList(releases || []);
+      setTrendingList(trending || []);
+      setPopularList(popular || []);
+      setCategoriesList(cats || []);
+      setCountriesList(countries || []);
+      setDjsList(djs || []);
     } catch (e) {
       console.error('Error synchronizing customer home data:', e);
     }
@@ -141,31 +133,30 @@ export default function CustomerHomePage() {
           </section>
         )}
 
-        {/* 1. Automated: New Releases (Newest Uploaded & Dubbed Titles) */}
-        <ContentRail
-          title="New Releases"
-          subtitle="Recently Uploaded &amp; Dubbed"
-          movies={releasesList}
-          featuredBadge={true}
-          seeAllHref="/movies"
-        />
-
-        {/* 2. Automated: Trending Movies (#1 to #10 in East Africa) */}
-        <ContentRail
-          title="Trending Movies"
-          subtitle="Top 10 In East Africa"
-          movies={trendingList}
-          showRank={true}
-          seeAllHref="/movies"
-        />
-
-        {/* 3. Automated: Popular Movies (Most Watched & Downloaded) */}
-        <ContentRail
-          title="Popular Movies"
-          subtitle="Most Watched &amp; Downloaded"
-          movies={popularList}
-          seeAllHref="/movies"
-        />
+        {/* Adaptive Catalog Discovery: Small Catalog vs Large Catalog */}
+        {releasesList.length > 0 && releasesList.length <= 5 ? (
+          /* Adaptive Mode A: Compact Editorial Showcase (Prevents triple-rail duplication) */
+          <CuratedSpotlightDeck movies={releasesList} />
+        ) : (
+          /* Adaptive Mode B: Multi-Rail Showcase (When catalog has > 5 distinct titles) */
+          <>
+            <ContentRail
+              title="New Releases"
+              subtitle="Recently Uploaded &amp; Dubbed"
+              movies={releasesList.slice(0, 10)}
+              featuredBadge={true}
+              seeAllHref="/movies"
+            />
+            {releasesList.length > 10 && (
+              <ContentRail
+                title="Popular Movies"
+                subtitle="Most Watched &amp; Downloaded"
+                movies={releasesList.slice(10)}
+                seeAllHref="/movies"
+              />
+            )}
+          </>
+        )}
 
         {/* 4. Required Order: Movies by Categories */}
         <CategoryRail categories={categoriesList} />

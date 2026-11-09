@@ -15,6 +15,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { catalogApi } from '@/lib/api/catalogApi';
 
 interface NavItem {
   label: string;
@@ -41,7 +42,20 @@ export const MediaTeamSidebar: React.FC<MediaTeamSidebarProps> = ({
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [movieCount, setMovieCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    let isMounted = true;
+    catalogApi.listTitles({ limit: 100 }).then((res) => {
+      if (isMounted && res?.items) {
+        setMovieCount(res.items.length);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const navGroups: NavGroup[] = [
     {
@@ -61,15 +75,13 @@ export const MediaTeamSidebar: React.FC<MediaTeamSidebarProps> = ({
           label: 'Movie Library',
           href: '/media-team/movies',
           icon: Film,
-          badge: '1,420',
+          badge: movieCount !== null ? String(movieCount) : undefined,
           badgeColor: 'bg-[#181A21] text-[#A6A8B0] border-[#262932]',
         },
         {
           label: 'Series & TV Shows',
           href: '/media-team/series',
           icon: Video,
-          badge: '380',
-          badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
         },
       ],
     },
@@ -80,8 +92,6 @@ export const MediaTeamSidebar: React.FC<MediaTeamSidebarProps> = ({
           label: 'Review Queue',
           href: '/media-team/review',
           icon: CheckSquare,
-          badge: 'Ready for Live',
-          badgeColor: 'bg-[#10B981]/20 text-[#10B981] border-[#10B981]/30',
         },
       ],
     },

@@ -7,7 +7,6 @@ import { MovieCard } from '@/components/customer/MovieCard';
 import { TrailerModal } from '@/components/customer/TrailerModal';
 import { LipaModal } from '@/components/customer/LipaModal';
 import { SearchDrawer } from '@/components/customer/SearchDrawer';
-import { customerMovies, customerCategories, customerDjs } from '@/data/mock/customerData';
 import { adminRepository } from '@/lib/repositories/adminRepository';
 import { MovieItem, CategoryItem, DjItem } from '@/types/customer';
 import { Film, Filter, SlidersHorizontal, Sparkles } from 'lucide-react';
@@ -18,9 +17,9 @@ export default function MoviesCatalogPage() {
   const [selectedDj, setSelectedDj] = useState('All');
   const [sortBy, setSortBy] = useState<'newest' | 'trending' | 'rating' | 'price'>('newest');
 
-  const [moviesList, setMoviesList] = useState<MovieItem[]>(customerMovies);
-  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(customerCategories);
-  const [djsList, setDjsList] = useState<DjItem[]>(customerDjs);
+  const [moviesList, setMoviesList] = useState<MovieItem[]>([]);
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>([]);
+  const [djsList, setDjsList] = useState<DjItem[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -30,9 +29,9 @@ export default function MoviesCatalogPage() {
         adminRepository.getDJs(),
       ]);
       const published = movs.filter((m) => m.status === 'published');
-      if (published.length > 0) setMoviesList(published);
-      if (cats.length > 0) setCategoriesList(cats);
-      if (djs.length > 0) setDjsList(djs);
+      setMoviesList(published || []);
+      setCategoriesList(cats || []);
+      setDjsList(djs || []);
     } catch (e) {
       console.error('Error synchronizing movies catalog:', e);
     }

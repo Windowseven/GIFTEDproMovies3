@@ -7,18 +7,74 @@ import {
   Patch,
   Post,
   Query,
+  Sse,
   UseGuards,
+  type MessageEvent,
 } from "@nestjs/common";
+import { Observable } from "rxjs";
 import { NotificationsService } from "./notifications.service.js";
 import { CurrentUser } from "../identity/decorators/index.js";
 import { SessionAuthGuard } from "../identity/guards/session-auth.guard.js";
 import type { SafeUser } from "../identity/services/auth.service.js";
 import type { NotificationRecord } from "../../infrastructure/database/schemas/notifications.schema.js";
+import { EventBusService } from "../../infrastructure/events/event-bus.service.js";
 
 @Controller("notifications")
 @UseGuards(SessionAuthGuard)
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly eventBus: EventBusService,
+  ) {}
+
+  @Sse("stream")
+  streamNotifications(@CurrentUser() user: SafeUser): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((observer) => {
+      // 1. Initial connection acknowledgement event with retry directive
+      observer.next({
+        type: "connected",
+        retry: 5000,
+        data: {
+          connected: true,
+          userId: user.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      // 2. Subscribe to event bus for real-time notification events
+      const unsubscribe = this.eventBus.subscribe<{
+        eventName: string;
+        occurredAt: Date;
+        payload: NotificationRecord;
+      }>("notification.created", (event) => {
+        // Enforce strict tenant isolation / user ownership
+        if (event.payload && event.payload.userId === user.id) {
+          observer.next({
+            type: "notification",
+            data: event.payload,
+          });
+        }
+      });
+
+      // 3. Keep-alive heartbeat every 12 seconds to prevent reverse-proxy timeout
+      const heartbeatInterval = setInterval(() => {
+        try {
+          observer.next({
+            type: "heartbeat",
+            data: { timestamp: new Date().toISOString() },
+          });
+        } catch {
+          // Socket closed
+        }
+      }, 12000);
+
+      // 4. Teardown logic when client disconnects or stream ends
+      return () => {
+        clearInterval(heartbeatInterval);
+        unsubscribe();
+      };
+    });
+  }
 
   @Get()
   async listNotifications(

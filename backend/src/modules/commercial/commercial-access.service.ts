@@ -311,6 +311,7 @@ export class CommercialAccessService {
           grantType: "CATALOG_GRANT",
           policyType: "ALL_CATALOG",
           orderId: grant.orderId,
+          entitlementId: anchor.id,
           expiresAt,
         };
       }
@@ -341,6 +342,7 @@ export class CommercialAccessService {
               grantType: "CATALOG_GRANT",
               policyType: snapshot.policyType,
               orderId: grant.orderId,
+              entitlementId: anchor.id,
               expiresAt,
             };
           }

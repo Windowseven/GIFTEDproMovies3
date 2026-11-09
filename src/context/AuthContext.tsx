@@ -19,13 +19,14 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (credentials: LoginCredentials) => Promise<boolean>;
-  register: (credentials: RegisterCredentials) => Promise<boolean>;
-  logout: () => void;
+  retryAfter: number | null;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; user?: AuthUser; error?: string; errorCode?: string; retryAfter?: number }>;
+  register: (credentials: RegisterCredentials) => Promise<{ success: boolean; message?: string; error?: string; retryAfter?: number }>;
+  logout: () => Promise<void>;
   forgotPassword: (payload: ForgotPasswordPayload) => Promise<{ success: boolean; message?: string; error?: string }>;
   resetPassword: (payload: ResetPasswordPayload) => Promise<{ success: boolean; message?: string; error?: string }>;
-  switchMockRole: (role: UserRole | 'GUEST') => void;
   clearError: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,26 +35,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>('IDLE');
   const [error, setError] = useState<string | null>(null);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Initialize from storage on client mount
-  useEffect(() => {
-    const existing = authRepository.getCurrentUser();
-    if (existing) {
-      setUser(existing);
-      setStatus('AUTHENTICATED');
-    } else {
+  const refreshUser = useCallback(async () => {
+    try {
+      const activeUser = await authRepository.getCurrentUser();
+      if (activeUser) {
+        setUser(activeUser);
+        setStatus('AUTHENTICATED');
+      } else {
+        setUser(null);
+        setStatus('UNAUTHENTICATED');
+      }
+    } catch {
+      setUser(null);
       setStatus('UNAUTHENTICATED');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
+
+  // Initialize from backend session on mount
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   const clearError = useCallback(() => {
     setError(null);
+    setRetryAfter(null);
   }, []);
 
-  const login = async (credentials: LoginCredentials): Promise<boolean> => {
+  const login = async (
+    credentials: LoginCredentials,
+  ): Promise<{ success: boolean; user?: AuthUser; error?: string; errorCode?: string; retryAfter?: number }> => {
     setError(null);
+    setRetryAfter(null);
     setIsLoading(true);
     setStatus('LOADING');
 
@@ -63,16 +80,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (res.success && res.user) {
       setUser(res.user);
       setStatus('AUTHENTICATED');
-      return true;
+      return { success: true, user: res.user };
     } else {
       setError(res.error || 'Authentication failed. Please check your credentials.');
+      if (res.retryAfter) {
+        setRetryAfter(res.retryAfter);
+      }
       setStatus('ERROR');
-      return false;
+      return {
+        success: false,
+        error: res.error,
+        errorCode: res.errorCode,
+        retryAfter: res.retryAfter,
+      };
     }
   };
 
-  const register = async (credentials: RegisterCredentials): Promise<boolean> => {
+  const register = async (
+    credentials: RegisterCredentials,
+  ): Promise<{ success: boolean; message?: string; error?: string; retryAfter?: number }> => {
     setError(null);
+    setRetryAfter(null);
     setIsLoading(true);
     setStatus('LOADING');
 
@@ -82,19 +110,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (res.success && res.user) {
       setUser(res.user);
       setStatus('AUTHENTICATED');
-      return true;
+      return { success: true, message: res.message };
     } else {
       setError(res.error || 'Registration failed. Please check your details.');
+      if (res.retryAfter) {
+        setRetryAfter(res.retryAfter);
+      }
       setStatus('ERROR');
-      return false;
+      return {
+        success: false,
+        error: res.error,
+        retryAfter: res.retryAfter,
+      };
     }
   };
 
-  const logout = () => {
-    authRepository.logout();
+  const logout = async () => {
+    setIsLoading(true);
+    await authRepository.logout();
     setUser(null);
     setStatus('UNAUTHENTICATED');
     setError(null);
+    setRetryAfter(null);
+    setIsLoading(false);
   };
 
   const forgotPassword = async (payload: ForgotPasswordPayload) => {
@@ -103,17 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (payload: ResetPasswordPayload) => {
     return await authRepository.resetPassword(payload);
-  };
-
-  const switchMockRole = (targetRole: UserRole | 'GUEST') => {
-    const updatedUser = authRepository.switchMockRole(targetRole);
-    if (updatedUser) {
-      setUser(updatedUser);
-      setStatus('AUTHENTICATED');
-    } else {
-      setUser(null);
-      setStatus('UNAUTHENTICATED');
-    }
   };
 
   const role: UserRole | 'GUEST' = user ? user.role : 'GUEST';
@@ -128,13 +155,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated,
         isLoading,
         error,
+        retryAfter,
         login,
         register,
         logout,
         forgotPassword,
         resetPassword,
-        switchMockRole,
         clearError,
+        refreshUser,
       }}
     >
       {children}

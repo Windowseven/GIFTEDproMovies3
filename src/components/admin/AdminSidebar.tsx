@@ -1,6 +1,6 @@
 'use client';
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -21,8 +21,10 @@ import {
   BarChart3,
   LineChart,
   Settings,
+  ShieldAlert,
   X,
 } from "lucide-react";
+import { catalogApi } from "@/lib/api/catalogApi";
 
 interface AdminSidebarProps {
   onCloseMobileMenu?: () => void;
@@ -30,6 +32,43 @@ interface AdminSidebarProps {
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onCloseMobileMenu }) => {
   const pathname = usePathname();
+  const [counts, setCounts] = useState<{
+    movies: number | null;
+    categories: number | null;
+    countries: number | null;
+    djs: number | null;
+  }>({
+    movies: null,
+    categories: null,
+    countries: null,
+    djs: null,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCounts = async () => {
+      try {
+        const [titlesRes, taxRes] = await Promise.all([
+          catalogApi.listTitles({ limit: 100 }),
+          catalogApi.getTaxonomies(),
+        ]);
+        if (isMounted) {
+          setCounts({
+            movies: titlesRes?.items ? titlesRes.items.length : 0,
+            categories: taxRes?.categories ? taxRes.categories.length : 0,
+            countries: taxRes?.countries ? taxRes.countries.length : 0,
+            djs: taxRes?.voiceArtists ? taxRes.voiceArtists.length : 0,
+          });
+        }
+      } catch {
+        // Silently preserve clean states without falling back to mock counts
+      }
+    };
+    fetchCounts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const navGroups = [
     {
@@ -50,31 +89,33 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onCloseMobileMenu })
           label: "Movies",
           href: "/admin/movies",
           icon: Film,
-          badge: "1,420",
+          badge: counts.movies !== null ? String(counts.movies) : undefined,
           badgeColor: "bg-[#111318] text-[#F5F5F5] border-[#262932]",
         },
         {
           label: "Series",
           href: "/admin/series",
           icon: Tv,
-          badge: "380",
-          badgeColor: "bg-[#111318] text-[#F5F5F5] border-[#262932]",
         },
         {
           label: "Categories",
           href: "/admin/categories",
           icon: Tags,
+          badge: counts.categories !== null ? String(counts.categories) : undefined,
+          badgeColor: "bg-[#111318] text-[#A6A8B0] border-[#262932]",
         },
         {
           label: "Countries",
           href: "/admin/countries",
           icon: Globe,
+          badge: counts.countries !== null ? String(counts.countries) : undefined,
+          badgeColor: "bg-[#111318] text-[#A6A8B0] border-[#262932]",
         },
         {
           label: "DJs & Translators",
           href: "/admin/djs",
           icon: Mic2,
-          badge: "8 Active",
+          badge: counts.djs !== null ? `${counts.djs} Active` : undefined,
           badgeColor: "bg-[#D6A84F]/15 text-[#D6A84F] border-[#D6A84F]/30",
         },
       ],
@@ -86,8 +127,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onCloseMobileMenu })
           label: "Hero Billboard",
           href: "/admin/featured",
           icon: Sparkles,
-          badge: "Carousel",
-          badgeColor: "bg-[#D6A84F]/15 text-[#D6A84F] border-[#D6A84F]/30",
         },
         {
           label: "Trending Content",
@@ -103,8 +142,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onCloseMobileMenu })
           label: "Customers",
           href: "/admin/users",
           icon: Users,
-          badge: "24.5k",
-          badgeColor: "bg-[#111318] text-[#A6A8B0] border-[#262932]",
         },
         {
           label: "Media Team Staff",
@@ -158,6 +195,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onCloseMobileMenu })
     {
       group: "System",
       items: [
+        {
+          label: "Audit Trail",
+          href: "/admin/audit",
+          icon: ShieldAlert,
+        },
         {
           label: "Platform Settings",
           href: "/admin/settings",

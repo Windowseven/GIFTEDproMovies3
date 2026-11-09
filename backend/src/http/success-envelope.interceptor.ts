@@ -4,7 +4,7 @@ import {
   type ExecutionContext,
   type NestInterceptor,
 } from "@nestjs/common";
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { map, type Observable } from "rxjs";
 
 interface SuccessEnvelope {
@@ -19,7 +19,19 @@ export class SuccessEnvelopeInterceptor implements NestInterceptor {
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<unknown> {
-    const reply = context.switchToHttp().getResponse<FastifyReply>();
+    const http = context.switchToHttp();
+    const request = http.getRequest<FastifyRequest>();
+    const reply = http.getResponse<FastifyReply>();
+
+    // Skip wrapping for SSE streaming endpoints
+    const acceptHeader = request?.headers?.accept ?? "";
+    if (
+      acceptHeader.includes("text/event-stream") ||
+      request?.url?.includes("/notifications/stream")
+    ) {
+      return next.handle();
+    }
+
     return next.handle().pipe(
       map((body: unknown) => {
         if (reply.statusCode === 204 || isSuccessEnvelope(body)) return body;

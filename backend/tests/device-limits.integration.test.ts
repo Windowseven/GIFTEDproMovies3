@@ -521,6 +521,33 @@ test("Customer device limit enforcement, concurrency, and session revocation sui
     assert.equal(check.rows.length, 1);
   });
 
+  await t.test("CDL-10: GET /api/v1/devices returns device list with POD-07 limit metadata", async () => {
+    // customPlanUser has a subscription with limit 4, and 4 devices registered from CDL-03
+    const customUserCookie = await makeSessionCookie(pool, customPlanUser);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+      headers: { cookie: customUserCookie },
+    });
+
+    assert.equal(res.statusCode, 200);
+    const json = JSON.parse(res.body);
+    assert.equal(json.success, true);
+    const data = json.data;
+    assert.ok(Array.isArray(data.devices));
+    assert.equal(data.devices.length, 4);
+    assert.equal(data.effectiveLimit, 4);
+    assert.equal(data.currentCount, 4);
+    assert.equal(data.remainingSlots, 0);
+
+    // Unauthenticated request returns 401
+    const unauthRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/devices",
+    });
+    assert.equal(unauthRes.statusCode, 401);
+  });
+
   await t.test("POD07-01: One-time movie purchase with high device limit (limit=8) does NOT increase capacity; falls back to default 2", async () => {
     const movieOnlyUser = randomUUID();
     await pool.query(

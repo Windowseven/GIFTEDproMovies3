@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { DRIZZLE_DATABASE } from "../../infrastructure/database/database.tokens.js";
 import type { ApplicationDatabase } from "../../infrastructure/database/database.module.js";
@@ -6,12 +6,15 @@ import {
   notificationsTable,
   type NotificationRecord,
 } from "../../infrastructure/database/schemas/notifications.schema.js";
+import { EventBusService } from "../../infrastructure/events/event-bus.service.js";
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @Inject(DRIZZLE_DATABASE)
     private readonly db: ApplicationDatabase,
+    @Optional()
+    private readonly eventBus?: EventBusService,
   ) {}
 
   async createNotification(
@@ -31,6 +34,14 @@ export class NotificationsService {
         data: data ?? null,
       })
       .returning();
+
+    if (record && this.eventBus) {
+      this.eventBus.publish({
+        eventName: "notification.created",
+        occurredAt: new Date(),
+        payload: record,
+      });
+    }
 
     return record!;
   }

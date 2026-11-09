@@ -21,7 +21,7 @@ interface HeroBillboardProps {
 }
 
 export function HeroBillboard({ movies }: HeroBillboardProps) {
-  const { openLipa, openTrailer } = useCustomer();
+  const { openTrailer } = useCustomer();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [progressKey, setProgressKey] = useState(0);
@@ -155,16 +155,16 @@ export function HeroBillboard({ movies }: HeroBillboardProps) {
                     </span>
                   </div>
 
-                  {/* Title */}
-                  <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none drop-shadow-2xl">
+                  {/* Title in Cinematic Bebas Neue */}
+                  <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bebas text-white tracking-wide leading-none drop-shadow-2xl">
                     {movie.title}
                   </h1>
 
                   {/* Metadata line */}
-                  <div className="flex items-center gap-3 text-xs sm:text-sm font-mono text-gray-300">
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs sm:text-sm font-mono text-gray-300">
                     <div className="flex items-center gap-1 text-emerald-400 font-bold">
                       <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
-                      <span>{movie.rating} Rating</span>
+                      <span>{movie.rating || '8.5'} Rating</span>
                     </div>
                     <span>•</span>
                     <span>{movie.releaseYear}</span>
@@ -184,38 +184,30 @@ export function HeroBillboard({ movies }: HeroBillboardProps) {
 
                   {/* Actions */}
                   <div className="flex flex-wrap items-center gap-3 pt-2">
-                    <button
-                      onClick={() =>
-                        openLipa({
-                          itemTitle: movie.title,
-                          itemType: movie.id.startsWith('s-') ? 'series' : 'movie',
-                          accessType: 'stream',
-                          amountTsh: streamPrice,
-                          djName: primaryDj,
-                          durationLabel: movie.id.startsWith('s-') ? 'Season Pass Access' : '48 Hours Access',
-                          itemSlug: movie.slug,
-                        })
-                      }
-                      className="px-6 py-3 rounded-full bg-[#E50914] hover:bg-[#B11226] text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-xl shadow-[#E50914]/35 transition-all transform hover:scale-105 active:scale-95"
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>WATCH / LIPA TSh {streamPrice.toLocaleString()}</span>
-                    </button>
-
-                    <button
-                      onClick={() => openTrailer(movie.title)}
-                      className="px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md border border-white/15 transition-all active:scale-95"
-                    >
-                      <Film className="w-4 h-4" />
-                      <span>Watch Trailer</span>
-                    </button>
-
                     <Link
                       href={movie.id.startsWith('s-') ? `/series/${movie.slug}` : `/movies/${movie.slug}`}
-                      className="px-4 py-3 rounded-full bg-[#111318]/80 hover:bg-[#181A21] text-gray-300 hover:text-white text-xs sm:text-sm flex items-center gap-1.5 border border-[#262932] transition-colors"
+                      className="px-6 py-3.5 rounded-full bg-[#E50914] hover:bg-[#B11226] text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-xl shadow-[#E50914]/35 transition-all transform hover:scale-105 active:scale-95"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>View Movie &amp; Dubs</span>
+                    </Link>
+
+                    {movie.trailerUrl && (
+                      <button
+                        onClick={() => openTrailer(movie.title, movie.trailerUrl || undefined)}
+                        className="px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md border border-white/15 transition-all active:scale-95"
+                      >
+                        <Film className="w-4 h-4" />
+                        <span>Preview Trailer</span>
+                      </button>
+                    )}
+
+                    <Link
+                      href="/movies"
+                      className="px-4 py-3.5 rounded-full bg-[#111318]/80 hover:bg-[#181A21] text-gray-300 hover:text-white text-xs sm:text-sm flex items-center gap-1.5 border border-[#262932] transition-colors"
                     >
                       <Info className="w-4 h-4" />
-                      <span>Details</span>
+                      <span>Browse All</span>
                     </Link>
                   </div>
                 </div>

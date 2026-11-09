@@ -165,7 +165,8 @@ test("AuthService.login rejects incorrect password with generic UnauthorizedExce
     async () => await authService.login("user@example.com", "WrongPassword"),
     (err: unknown) =>
       err instanceof UnauthorizedException &&
-      err.message.includes("Invalid email or password"),
+      (err.message.includes("Unable to sign in with the provided credentials") ||
+        err.message.includes("Invalid email or password")),
   );
 });
 

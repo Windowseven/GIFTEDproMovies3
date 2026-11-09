@@ -5,17 +5,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Bell,
   Menu,
   X,
-  CheckCircle2,
-  AlertTriangle,
   UploadCloud,
   ChevronDown,
   ExternalLink,
   LogOut,
-  Info,
 } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface MediaTeamHeaderProps {
   onToggleMobileMenu?: () => void;
@@ -27,35 +24,7 @@ export const MediaTeamHeader: React.FC<MediaTeamHeaderProps> = ({
   isMobileMenuOpen,
 }) => {
   const { user, logout } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-
-  const notifications = [
-    {
-      id: 'notif-1',
-      title: 'Missing Streaming Media',
-      desc: 'The Beekeeper: Master video file has not been uploaded.',
-      time: '15 minutes ago',
-      unread: true,
-      type: 'warning',
-    },
-    {
-      id: 'notif-2',
-      title: 'Streaming Media Ready',
-      desc: 'Extraction 2: Dar Hunt is processed and ready for catalog.',
-      time: '1 hour ago',
-      unread: true,
-      type: 'success',
-    },
-    {
-      id: 'notif-3',
-      title: 'Missing Artwork',
-      desc: 'Godzilla x Kong: 16:9 backdrop banner image missing.',
-      time: '3 hours ago',
-      unread: false,
-      type: 'info',
-    },
-  ];
 
   return (
     <header className="sticky top-0 z-40 bg-[#08090C]/90 backdrop-blur-xl border-b border-[#262932] h-[57px] flex items-center justify-between px-4 lg:px-6">
@@ -112,48 +81,8 @@ export const MediaTeamHeader: React.FC<MediaTeamHeaderProps> = ({
 
       {/* Right: Notifications & Studio Profile */}
       <div className="flex items-center gap-2">
-        {/* Notifications Drawer */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#111318] text-gray-400 hover:text-white border border-[#262932] transition-colors relative"
-            aria-label="Studio Alerts"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#08090C]" />
-          </button>
-
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-88 bg-[#111318] border border-[#262932] rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center justify-between pb-3 border-b border-white/5">
-                <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                  Content Alerts (3)
-                </span>
-                <span className="text-[10px] font-mono text-[#A6A8B0] cursor-pointer hover:text-white hover:underline">
-                  Mark all as read
-                </span>
-              </div>
-
-              <div className="divide-y divide-white/5 mt-2 space-y-1 max-h-72 overflow-y-auto">
-                {notifications.map(n => (
-                  <div key={n.id} className="py-2.5 first:pt-1 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-white flex items-center gap-1.5">
-                        {n.type === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />}
-                        {n.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />}
-                        {n.type === 'info' && <Info className="w-3.5 h-3.5 text-blue-400" />}
-                        {n.title}
-                      </span>
-                      {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
-                    </div>
-                    <p className="text-gray-400 text-[11px] mt-0.5">{n.desc}</p>
-                    <span className="text-[10px] font-mono text-gray-500 mt-1 block">{n.time}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Real-time Notification Bell */}
+        <NotificationBell />
 
         {/* Studio Operator Profile */}
         <div className="relative">

@@ -18,12 +18,15 @@ import {
   User,
   ArrowRight,
   LogOut,
-  FolderLock,
   ChevronDown,
+  Receipt,
+  Smartphone,
+  KeyRound,
 } from 'lucide-react';
 import { CustomerBrandLogo } from './CustomerBrandLogo';
 import { useCustomer } from '@/context/CustomerContext';
 import { useAuth } from '@/context/AuthContext';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export function CustomerHeader() {
   const pathname = usePathname();
@@ -115,6 +118,9 @@ export function CustomerHeader() {
               <span>Library</span>
             </Link>
 
+            {/* Notification Bell (for authenticated customers) */}
+            {isAuthenticated && <NotificationBell />}
+
             {/* Guest vs Authenticated Mode Dropdown / Button */}
             <div className="relative">
               {isAuthenticated ? (
@@ -172,12 +178,39 @@ export function CustomerHeader() {
                   </Link>
 
                   <Link
+                    href="/account/orders"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#181A21] rounded-xl transition-colors"
+                  >
+                    <Receipt className="w-4 h-4 text-gray-400" />
+                    <span>Orders &amp; Receipts</span>
+                  </Link>
+
+                  <Link
                     href="/subscriptions"
                     onClick={() => setShowProfileMenu(false)}
                     className="flex items-center gap-2.5 px-3 py-2 text-xs text-[#D6A84F] hover:bg-[#181A21] rounded-xl transition-colors"
                   >
                     <Crown className="w-4 h-4" />
                     <span>VIP Passes &amp; Perks</span>
+                  </Link>
+
+                  <Link
+                    href="/account/devices"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#181A21] rounded-xl transition-colors"
+                  >
+                    <Smartphone className="w-4 h-4 text-gray-400" />
+                    <span>Registered Devices</span>
+                  </Link>
+
+                  <Link
+                    href="/account/security"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-[#181A21] rounded-xl transition-colors"
+                  >
+                    <KeyRound className="w-4 h-4 text-gray-400" />
+                    <span>Security &amp; Password</span>
                   </Link>
 
                   {(role === 'ADMIN' || role === 'MEDIA_TEAM') && (
@@ -320,6 +353,34 @@ export function CustomerHeader() {
                   <span>My Library</span>
                   <Film className="w-4 h-4 opacity-50" />
                 </Link>
+                {isAuthenticated && (
+                  <>
+                    <Link
+                      href="/account/orders"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-gray-300 hover:bg-[#181A21] hover:text-white"
+                    >
+                      <span>Orders &amp; Receipts</span>
+                      <Receipt className="w-4 h-4 opacity-50" />
+                    </Link>
+                    <Link
+                      href="/account/devices"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-gray-300 hover:bg-[#181A21] hover:text-white"
+                    >
+                      <span>Registered Devices</span>
+                      <Smartphone className="w-4 h-4 opacity-50" />
+                    </Link>
+                    <Link
+                      href="/account/security"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium text-gray-300 hover:bg-[#181A21] hover:text-white"
+                    >
+                      <span>Account Security</span>
+                      <KeyRound className="w-4 h-4 opacity-50" />
+                    </Link>
+                  </>
+                )}
               </div>
 
               {/* Staff Switcher inside mobile drawer */}

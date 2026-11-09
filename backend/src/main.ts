@@ -1,3 +1,4 @@
+import "dotenv/config";
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";

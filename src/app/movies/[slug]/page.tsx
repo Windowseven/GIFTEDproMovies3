@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { CustomerHeader } from '@/components/customer/CustomerHeader';
 import { CustomerFooter } from '@/components/customer/CustomerFooter';
 import { ContentRail } from '@/components/customer/ContentRail';
 import { TrailerModal } from '@/components/customer/TrailerModal';
 import { LipaModal } from '@/components/customer/LipaModal';
 import { SearchDrawer } from '@/components/customer/SearchDrawer';
-import { getMovieBySlug, customerMovies } from '@/data/mock/customerData';
+import { catalogApi } from '@/lib/api/catalogApi';
+import { adminRepository } from '@/lib/repositories/adminRepository';
+import { MovieItem } from '@/types/customer';
 import { useCustomer } from '@/context/CustomerContext';
+import { downloadApi } from '@/lib/api/downloadApi';
 import {
   Play,
   Download,
@@ -18,14 +20,11 @@ import {
   Star,
   Clock,
   Mic,
-  ShieldCheck,
   CheckCircle2,
-  Share2,
   Calendar,
   Globe,
-  Sparkles,
-  Layers,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 
 interface MovieDetailsPageProps {
@@ -34,34 +33,168 @@ interface MovieDetailsPageProps {
 
 export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
   const { slug } = use(params);
-  const movie = getMovieBySlug(slug);
+  const [movie, setMovie] = useState<MovieItem | null>(null);
+  const [relatedMovies, setRelatedMovies] = useState<MovieItem[]>([]);
+  const [djMovies, setDjMovies] = useState<MovieItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [notFoundState, setNotFoundState] = useState<boolean>(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string>('v-default');
+
   const { openLipa, openTrailer, entitlements, profile } = useCustomer();
 
-  // If movie slug does not exist, return 404
-  if (!movie) {
-    notFound();
+  useEffect(() => {
+    let isCancelled = false;
+    async function loadMovieData() {
+      setIsLoading(true);
+      setNotFoundState(false);
+      try {
+        const detail = await catalogApi.getTitleBySlug(slug).catch(() => null);
+        if (!detail) {
+          if (!isCancelled) setNotFoundState(true);
+          return;
+        }
+
+        const versionsList =
+          detail.editions && detail.editions.length > 0
+            ? detail.editions.map((ed) => ({
+                id: ed.id,
+                djId: ed.dj.id,
+                djName: ed.dj.stageName || 'Swahili DJ Dub',
+                streamingPriceTsh: 1500,
+                downloadPriceTsh: 2500,
+                accessDurationHours: 48,
+                streamingStatus: 'streaming_ready' as const,
+                downloadStatus: 'download_ready' as const,
+                isDefault: ed.isDefault,
+              }))
+            : [
+                {
+                  id: 'v-default',
+                  djId: 'dj-murphy',
+                  djName: 'DJ Murphy',
+                  streamingPriceTsh: 1500,
+                  downloadPriceTsh: 2500,
+                  accessDurationHours: 48,
+                  streamingStatus: 'streaming_ready' as const,
+                  downloadStatus: 'download_ready' as const,
+                  isDefault: true,
+                },
+              ];
+
+        const mappedMovie: MovieItem = {
+          id: detail.id,
+          title: detail.title,
+          originalTitle: detail.originalTitle || detail.title,
+          slug: detail.slug,
+          releaseYear: detail.releaseYear || 2024,
+          durationMinutes: detail.durationMinutes || 120,
+          posterUrl: detail.posterUrl || '/images/placeholders/movie_card_empty.svg',
+          backdropUrl: detail.backdropUrl || '/images/placeholders/movie_card_empty.svg',
+          trailerUrl: detail.trailerUrl || undefined,
+          description: detail.description || 'African cinematic translation release.',
+          genres: (detail.categories || []).map((c) => c.name),
+          countries: (detail.countries || []).map((c) => c.name),
+          ageRating: '16+',
+          rating: 8.5,
+          streamingStatus: 'streaming_ready',
+          downloadStatus: 'download_ready',
+          status: 'published',
+          isFeatured: false,
+          isTrending: false,
+          viewsCount: 0,
+          purchasesCount: 0,
+          downloadsCount: 0,
+          publishedAt: detail.publishedAt || new Date().toISOString(),
+          versions: versionsList,
+        };
+
+        if (!isCancelled) {
+          setMovie(mappedMovie);
+          if (versionsList.length > 0) {
+            setSelectedVersionId(versionsList[0].id);
+          }
+
+          const allMovies = await adminRepository.getMovies().catch(() => []);
+          const related = allMovies.filter(
+            (m) => m.id !== mappedMovie.id && m.genres.some((g) => mappedMovie.genres.includes(g))
+          );
+          setRelatedMovies(related);
+
+          const leadDj = versionsList[0]?.djName;
+          const sameDj = allMovies.filter(
+            (m) => m.id !== mappedMovie.id && m.versions?.some((v) => v.djName === leadDj)
+          );
+          setDjMovies(sameDj);
+        }
+      } catch {
+        if (!isCancelled) setNotFoundState(true);
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    }
+
+    loadMovieData();
+    return () => {
+      isCancelled = true;
+    };
+  }, [slug]);
+
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] flex flex-col font-sans">
+        <CustomerHeader />
+        <main className="flex-1 flex flex-col items-center justify-center py-32 space-y-4">
+          <RefreshCw className="w-8 h-8 text-[#E50914] animate-spin" />
+          <p className="text-xs font-mono text-gray-400">Retrieving movie details and DJ dubs...</p>
+        </main>
+        <CustomerFooter />
+      </div>
+    );
   }
 
-  // Version selection state (default to first version or fallback)
-  const defaultVersion = movie.versions && movie.versions.length > 0 ? movie.versions[0] : null;
-  const [selectedVersionId, setSelectedVersionId] = useState<string>(
-    defaultVersion ? defaultVersion.id : 'v-default'
-  );
+  if (notFoundState || !movie) {
+    return (
+      <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] flex flex-col font-sans">
+        <CustomerHeader />
+        <main className="flex-1 flex flex-col items-center justify-center py-32 space-y-4 px-4 text-center">
+          <Film className="w-12 h-12 text-gray-600" />
+          <h1 className="text-xl font-bold text-white">Movie Not Found</h1>
+          <p className="text-xs text-gray-400 max-w-sm">
+            We could not find the requested title. It may be currently offline or being remastered.
+          </p>
+          <Link
+            href="/movies"
+            className="px-5 py-2.5 rounded-full bg-[#E50914] text-white text-xs font-bold shadow-lg shadow-[#E50914]/20 hover:scale-105 transition-transform"
+          >
+            Explore Available Catalog
+          </Link>
+        </main>
+        <CustomerFooter />
+      </div>
+    );
+  }
 
   const activeVersion =
-    movie.versions?.find((v) => v.id === selectedVersionId) || {
+    movie.versions.find((v) => v.id === selectedVersionId) ||
+    movie.versions[0] || {
       id: 'v-default',
-      djName: movie.availableDjs?.[0] || 'Swahili DJ Dub',
-      streamingPriceTsh: movie.streamPriceTsh || 1500,
-      downloadPriceTsh: movie.downloadPriceTsh || 2500,
+      djId: 'dj-murphy',
+      djName: 'Swahili DJ Dub',
+      streamingPriceTsh: 1500,
+      downloadPriceTsh: 2500,
       accessDurationHours: 48,
+      streamingStatus: 'streaming_ready' as const,
+      downloadStatus: 'download_ready' as const,
+      isDefault: true,
     };
 
-  const streamPrice = activeVersion.streamingPriceTsh || movie.streamPriceTsh || 1500;
-  const downloadPrice = activeVersion.downloadPriceTsh || movie.downloadPriceTsh || 2500;
+  const streamPrice = activeVersion.streamingPriceTsh || 1500;
+  const downloadPrice = activeVersion.downloadPriceTsh || 2500;
   const accessDuration = activeVersion.accessDurationHours || 48;
 
-  // Access checks
   const isVip = profile.isVip;
   const hasStreamAccess =
     isVip ||
@@ -81,28 +214,47 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
         e.accessType === 'download'
     );
 
-  const handleTriggerDownload = () => {
-    const filename = `${movie.slug}_${activeVersion.djName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_mobile.mp4`;
-    const blob = new Blob([`GIFTEDproMovies Offline Package: ${movie.title} (${activeVersion.djName})`], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleTriggerDownload = async () => {
+    setIsDownloading(true);
+    setDownloadError(null);
+    let attemptId: string | undefined;
+
+    try {
+      const editionId = activeVersion.id && !activeVersion.id.startsWith('v-') ? activeVersion.id : undefined;
+      const res = await downloadApi.authorizeDownload({
+        contentId: movie.id,
+        editionId,
+      });
+
+      attemptId = res.attemptId;
+      if (!res.authorized || !res.downloadUrl) {
+        throw new Error('Download authorization was not granted. Please check active passes.');
+      }
+
+      const a = document.createElement('a');
+      a.href = res.downloadUrl;
+      a.download = res.fileName || (movie.slug + '_mobile.mp4');
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      await downloadApi.reportDelivery(res.attemptId, 'COMPLETED');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Download authorization failed. Active pass or entitlement required.';
+      setDownloadError(msg);
+      if (attemptId) {
+        try {
+          await downloadApi.reportDelivery(attemptId, 'FAILED', msg);
+        } catch {
+          // ignore
+        }
+      }
+    } finally {
+      setIsDownloading(false);
+    }
   };
-
-  // Related movies
-  const relatedMovies = customerMovies.filter(
-    (m) => m.id !== movie.id && m.genres.some((g) => movie.genres.includes(g))
-  );
-
-  // More from this DJ
-  const djMovies = customerMovies.filter(
-    (m) => m.id !== movie.id && m.availableDjs && m.availableDjs.includes(activeVersion.djName)
-  );
 
   return (
     <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] flex flex-col font-sans selection:bg-[#E50914] selection:text-white">
@@ -111,19 +263,15 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
       <main className="flex-1 pb-16 space-y-10">
         {/* 1. Cinematic Hero Section with Backdrop Image */}
         <div className="relative w-full min-h-[600px] lg:min-h-[680px] overflow-hidden bg-[#08090C] flex flex-col justify-end">
-          {/* Backdrop Image with Slow Ken-Burns Scale */}
           <div
             className="absolute inset-0 bg-cover bg-center animate-kenburns"
-            style={{ backgroundImage: `url(${movie.backdropUrl})` }}
+            style={{ backgroundImage: 'url(' + movie.backdropUrl + ')' }}
           />
 
-          {/* Scrim Overlays */}
           <div className="absolute inset-0 scrim-hero z-10 pointer-events-none" />
           <div className="absolute inset-0 scrim-bottom z-10 pointer-events-none" />
 
-          {/* Hero Content Grid: Poster + Main Details */}
           <div className="relative z-20 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-32 pb-10">
-            {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-xs font-mono text-gray-400 mb-6">
               <Link href="/" className="hover:text-white">Home</Link>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -133,7 +281,6 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
             </div>
 
             <div className="flex flex-col md:flex-row items-start gap-8 lg:gap-12">
-              {/* 2:3 Portrait Poster */}
               <div className="shrink-0 w-48 sm:w-60 md:w-64 aspect-[2/3] rounded-3xl overflow-hidden bg-[#111318] border-2 border-white/10 shadow-2xl shadow-black/80 relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -147,9 +294,7 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                 </div>
               </div>
 
-              {/* Movie Info & Actions */}
               <div className="flex-1 space-y-4 max-w-3xl">
-                {/* Tags */}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2.5 py-1 rounded-full bg-[#E50914] text-white text-[11px] font-mono font-black uppercase tracking-wider">
                     Swahili Commentary
@@ -162,7 +307,6 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                   </span>
                 </div>
 
-                {/* Title */}
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none">
                   {movie.title}
                 </h1>
@@ -172,7 +316,6 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                   </p>
                 )}
 
-                {/* Metadata Line */}
                 <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm font-mono text-gray-300">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-gray-400" />
@@ -190,12 +333,11 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                   </span>
                 </div>
 
-                {/* Genres */}
                 <div className="flex flex-wrap gap-2 pt-1">
                   {movie.genres.map((genre) => (
                     <Link
                       key={genre}
-                      href={`/categories/${genre.toLowerCase()}`}
+                      href={'/categories/' + genre.toLowerCase()}
                       className="px-3 py-1 rounded-xl bg-[#111318]/90 border border-[#262932] hover:border-[#E50914]/50 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
                     >
                       {genre}
@@ -203,29 +345,29 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                   ))}
                 </div>
 
-                {/* Description */}
                 <p className="text-xs sm:text-sm text-gray-300 leading-relaxed pt-1">
                   {movie.description}
                 </p>
 
-                {/* Actions: Play if Unlocked / Watch Trailer */}
                 <div className="pt-2 flex flex-wrap items-center gap-3">
                   {hasStreamAccess && (
                     <Link
-                      href={`/watch/${movie.slug}?dj=${encodeURIComponent(activeVersion.djName)}`}
+                      href={'/watch/' + movie.slug + '?dj=' + encodeURIComponent(activeVersion.djName)}
                       className="px-6 py-2.5 rounded-full bg-[#E50914] hover:bg-[#B11226] text-white text-xs font-bold flex items-center gap-2 shadow-xl shadow-[#E50914]/30 transition-all hover:scale-105 active:scale-95"
                     >
                       <Play className="w-4 h-4 fill-current" />
                       <span>Play Movie ({activeVersion.djName})</span>
                     </Link>
                   )}
-                  <button
-                    onClick={() => openTrailer(movie.title)}
-                    className="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md border border-white/20 transition-all active:scale-95"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Watch Official Trailer</span>
-                  </button>
+                  {movie.trailerUrl && (
+                    <button
+                      onClick={() => openTrailer(movie.title)}
+                      className="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md border border-white/20 transition-all active:scale-95"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Watch Official Trailer</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -235,7 +377,6 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
         {/* 2. DJ / Translator Version Selection & Watch vs Download Area */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="p-6 sm:p-8 rounded-3xl bg-[#111318] border border-[#262932] shadow-2xl space-y-6">
-            {/* Version Header & Switcher */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -251,52 +392,39 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                   </p>
                 </div>
                 <span className="text-xs font-mono text-gray-400 hidden sm:inline">
-                  {movie.versions?.length || movie.availableDjs?.length || 1} Editions Available
+                  {movie.versions.length} Editions Available
                 </span>
               </div>
 
               {/* DJ / Version Tabs */}
               <div className="flex flex-wrap gap-2.5 pt-2">
-                {movie.versions && movie.versions.length > 0 ? (
-                  movie.versions.map((ver) => {
-                    const isSelected = selectedVersionId === ver.id;
-                    return (
-                      <button
-                        key={ver.id}
-                        type="button"
-                        onClick={() => setSelectedVersionId(ver.id)}
-                        className={`px-4 py-2.5 rounded-2xl border text-left transition-all duration-200 flex items-center gap-3 ${
-                          isSelected
-                            ? 'bg-[#181A21] border-[#E50914] text-white shadow-lg shadow-[#E50914]/15 scale-[1.02]'
-                            : 'bg-[#0E1015] border-[#262932] text-gray-400 hover:text-white hover:border-white/20'
-                        }`}
-                      >
-                        <div
-                          className={`w-3 h-3 rounded-full ${
-                            isSelected ? 'bg-[#E50914] animate-pulse' : 'bg-gray-600'
-                          }`}
-                        />
-                        <div>
-                          <p className="text-xs font-bold">{ver.djName}</p>
-                          <p className="text-[10px] font-mono text-gray-500">
-                            TSh {ver.streamingPriceTsh.toLocaleString()} Stream • {ver.accessDurationHours}h Pass
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })
-                ) : (
-                  (movie.availableDjs || []).map((dj, idx) => (
+                {movie.versions.map((ver) => {
+                  const isSelected = selectedVersionId === ver.id;
+                  return (
                     <button
-                      key={dj}
+                      key={ver.id}
                       type="button"
-                      onClick={() => setSelectedVersionId(`v-${idx}`)}
-                      className="px-4 py-2.5 rounded-2xl bg-[#181A21] border border-[#E50914] text-white text-xs font-bold"
+                      onClick={() => setSelectedVersionId(ver.id)}
+                      className={'px-4 py-2.5 rounded-2xl border text-left transition-all duration-200 flex items-center gap-3 ' + (
+                        isSelected
+                          ? 'bg-[#181A21] border-[#E50914] text-white shadow-lg shadow-[#E50914]/15 scale-[1.02]'
+                          : 'bg-[#0E1015] border-[#262932] text-gray-400 hover:text-white hover:border-white/20'
+                      )}
                     >
-                      {dj}
+                      <div
+                        className={'w-3 h-3 rounded-full ' + (
+                          isSelected ? 'bg-[#E50914] animate-pulse' : 'bg-gray-600'
+                        )}
+                      />
+                      <div>
+                        <p className="text-xs font-bold">{ver.djName}</p>
+                        <p className="text-[10px] font-mono text-gray-500">
+                          TSh {ver.streamingPriceTsh.toLocaleString()} Stream • {ver.accessDurationHours}h Pass
+                        </p>
+                      </div>
                     </button>
-                  ))
-                )}
+                  );
+                })}
               </div>
             </div>
 
@@ -315,7 +443,7 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                   </div>
                 </div>
                 <Link
-                  href={`/watch/${movie.slug}?dj=${encodeURIComponent(activeVersion.djName)}`}
+                  href={'/watch/' + movie.slug + '?dj=' + encodeURIComponent(activeVersion.djName)}
                   className="shrink-0 px-5 py-2.5 rounded-xl bg-[#E50914] hover:bg-[#B11226] text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#E50914]/20 transition-all hover:scale-105"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
@@ -330,7 +458,7 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
               <div className="p-6 rounded-2xl bg-[#0E1015] border border-[#262932] hover:border-white/20 transition-all flex flex-col justify-between space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase ${hasStreamAccess ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'}`}>
+                    <span className={'px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase ' + (hasStreamAccess ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30')}>
                       {hasStreamAccess ? '✓ Pass Active' : 'Stream Online'}
                     </span>
                     <span className="text-xs font-mono text-gray-400">
@@ -350,14 +478,14 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                       {hasStreamAccess ? 'Access Status' : 'Rental Price'}
                     </span>
                     <p className="text-2xl font-black text-emerald-400 font-mono">
-                      {hasStreamAccess ? 'UNLOCKED' : `TSh ${streamPrice.toLocaleString()}`}
+                      {hasStreamAccess ? 'UNLOCKED' : 'TSh ' + streamPrice.toLocaleString()}
                     </p>
                   </div>
                 </div>
 
                 {hasStreamAccess ? (
                   <Link
-                    href={`/watch/${movie.slug}?dj=${encodeURIComponent(activeVersion.djName)}`}
+                    href={'/watch/' + movie.slug + '?dj=' + encodeURIComponent(activeVersion.djName)}
                     className="w-full py-3.5 px-4 rounded-xl bg-[#E50914] hover:bg-[#B11226] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-[#E50914]/25 transition-transform active:scale-98"
                   >
                     <Play className="w-4 h-4 fill-current" />
@@ -372,7 +500,7 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                         accessType: 'stream',
                         amountTsh: streamPrice,
                         djName: activeVersion.djName,
-                        durationLabel: `${accessDuration} Hours Access`,
+                        durationLabel: accessDuration + ' Hours Access',
                         itemSlug: movie.slug,
                       })
                     }
@@ -388,7 +516,7 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
               <div className="p-6 rounded-2xl bg-[#0E1015] border border-[#262932] hover:border-white/20 transition-all flex flex-col justify-between space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase ${hasDownloadAccess ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'}`}>
+                    <span className={'px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase ' + (hasDownloadAccess ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'bg-blue-500/10 text-blue-400 border border-blue-500/30')}>
                       {hasDownloadAccess ? '✓ License Active' : 'Offline Download'}
                     </span>
                     <span className="text-xs font-mono text-gray-400">
@@ -408,18 +536,25 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                       {hasDownloadAccess ? 'Download Status' : 'Download License'}
                     </span>
                     <p className="text-2xl font-black text-blue-400 font-mono">
-                      {hasDownloadAccess ? 'READY TO SAVE' : `TSh ${downloadPrice.toLocaleString()}`}
+                      {hasDownloadAccess ? 'READY TO SAVE' : 'TSh ' + downloadPrice.toLocaleString()}
                     </p>
                   </div>
                 </div>
 
+                {downloadError && (
+                  <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-red-300 text-[11px] font-mono">
+                    {downloadError}
+                  </div>
+                )}
+
                 {hasDownloadAccess ? (
                   <button
                     onClick={handleTriggerDownload}
-                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-blue-600/25 transition-transform active:scale-98"
+                    disabled={isDownloading}
+                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-blue-600/25 transition-transform active:scale-98"
                   >
                     <Download className="w-4 h-4" />
-                    <span>DOWNLOAD MOBILE MP4</span>
+                    <span>{isDownloading ? 'Authorizing R2 Download...' : 'DOWNLOAD MOBILE MP4'}</span>
                   </button>
                 ) : (
                   <button
@@ -484,14 +619,14 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
         {relatedMovies.length > 0 && (
           <ContentRail
             title="More Like This"
-            subtitle={`Related ${movie.genres[0]} Titles`}
+            subtitle={'Related ' + (movie.genres[0] || 'Movies') + ' Titles'}
             movies={relatedMovies}
           />
         )}
 
         {djMovies.length > 0 && (
           <ContentRail
-            title={`More by ${activeVersion.djName}`}
+            title={'More by ' + activeVersion.djName}
             subtitle="Commentator Collection"
             movies={djMovies}
           />

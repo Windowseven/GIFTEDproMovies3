@@ -23,6 +23,7 @@ export interface LipaTarget {
   djName?: string;
   durationLabel?: string;
   itemSlug?: string;
+  offerId?: string;
 }
 
 export interface TrailerTarget {
@@ -56,8 +57,8 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const [profile, setProfile] = useState<CustomerProfile>(mockCustomerProfile);
-  const [entitlements, setEntitlements] = useState<CustomerEntitlement[]>(mockCustomerEntitlements);
-  const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(mockContinueWatching);
+  const [entitlements, setEntitlements] = useState<CustomerEntitlement[]>([]);
+  const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [lastPurchaseSuccess, setLastPurchaseSuccess] = useState<boolean>(false);
 
@@ -74,7 +75,7 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
     amountTsh: 0,
   });
 
-  // Sync profile when auth user updates
+  // Sync profile & live entitlements when auth user updates
   useEffect(() => {
     if (auth.user) {
       setProfile({
@@ -83,10 +84,34 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         email: auth.user.email,
         phoneMasked: '0754 ••• 456',
         avatarUrl: auth.user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-        vipTierName: auth.user.vipTier || 'Free User',
+        vipTierName: auth.user.vipTier || 'Customer',
         vipExpiresAt: '2026-12-31T23:59:59Z',
         isVip: auth.user.vipTier ? auth.user.vipTier.includes('VIP') : false,
       });
+
+      // Fetch authentic customer entitlements from backend
+      import('@/lib/api/commercialApi').then(({ commercialApi }) => {
+        commercialApi.getMyLibrary().then((lib) => {
+          if (lib && lib.exactEntitlements) {
+            const mapped: CustomerEntitlement[] = lib.exactEntitlements.map((e) => ({
+              id: e.id,
+              itemTitle: 'Access Pass',
+              itemSlug: e.targetMovieContentId || 'pass',
+              itemType: e.targetKind === 'CATALOG' ? 'subscription' : 'movie',
+              accessType: 'vip_pass',
+              expiresAt: new Date(e.expiresAt).toLocaleDateString(),
+              isActive: e.status === 'ACTIVE',
+              orderNumber: `ORD-${e.id.slice(0, 4)}`,
+              amountTsh: 0,
+            }));
+            setEntitlements(mapped);
+          }
+        }).catch(() => {
+          setEntitlements([]);
+        });
+      });
+    } else {
+      setEntitlements([]);
     }
   }, [auth.user]);
 
@@ -95,8 +120,8 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
   const toggleAuth = () => {
     if (auth.isAuthenticated) {
       auth.logout();
-    } else {
-      auth.switchMockRole('CUSTOMER');
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/login';
     }
   };
 
@@ -145,9 +170,6 @@ export function CustomerProvider({ children }: { children: React.ReactNode }) {
         };
 
         setEntitlements((prev) => [newEntitlement, ...prev]);
-        if (!auth.isAuthenticated) {
-          auth.switchMockRole('CUSTOMER');
-        }
         setLastPurchaseSuccess(true);
         resolve(true);
       }, 1200);

@@ -90,7 +90,7 @@ export function DjSpotlightRail({ djs }: DjSpotlightRailProps) {
                     {dj.tier || 'Master Commentator'}
                   </span>
                   <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#181A21] text-[10px] font-mono text-[#D6A84F] border border-[#D6A84F]/20">
-                    {dj.activeTitlesCount} Releases
+                    {dj.activeTitlesCount && dj.activeTitlesCount > 0 ? `${dj.activeTitlesCount} Releases` : 'Voice Artist'}
                   </span>
                 </div>
               </div>

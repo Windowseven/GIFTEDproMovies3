@@ -22,6 +22,14 @@ const STATUS_DETAILS: Readonly<Record<number, { code: string; message: string }>
     code: "BAD_REQUEST",
     message: "The request is invalid.",
   },
+  [HttpStatus.UNAUTHORIZED]: {
+    code: "UNAUTHORIZED",
+    message: "Invalid credentials or unauthorized access.",
+  },
+  [HttpStatus.FORBIDDEN]: {
+    code: "FORBIDDEN",
+    message: "Access forbidden.",
+  },
   [HttpStatus.NOT_FOUND]: {
     code: "NOT_FOUND",
     message: "The requested resource was not found.",
@@ -71,6 +79,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const customResponse = isCustomObject
       ? (rawResponse as Record<string, unknown>)
       : null;
+    const customStringMessage = typeof rawResponse === "string" ? rawResponse : null;
 
     const statusDetails = STATUS_DETAILS[statusCode];
 
@@ -89,12 +98,12 @@ export class ApiExceptionFilter implements ExceptionFilter {
       statusCode === HttpStatus.SERVICE_UNAVAILABLE
         ? typeof customResponse?.message === "string" && customResponse.message.length > 0
           ? customResponse.message
-          : statusDetails?.message ?? "The service is temporarily unavailable."
+          : customStringMessage ?? statusDetails?.message ?? "The service is temporarily unavailable."
         : statusCode >= 500
           ? "An unexpected error occurred."
           : typeof customResponse?.message === "string" && customResponse.message.length > 0
             ? customResponse.message
-            : statusDetails?.message ?? "The request was rejected.";
+            : customStringMessage ?? statusDetails?.message ?? "The request was rejected.";
 
     if (statusCode >= 500 && statusCode !== HttpStatus.SERVICE_UNAVAILABLE) {
       this.logger.error(

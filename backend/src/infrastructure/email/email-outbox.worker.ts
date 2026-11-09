@@ -151,6 +151,7 @@ export class EmailOutboxWorker
     private readonly db: ApplicationDatabase,
     @Inject(EMAIL_SENDER)
     private readonly emailSender: EmailSender,
+    @Inject(EmailTemplateService)
     private readonly templateService: EmailTemplateService,
     @Inject(ENVIRONMENT_CONFIG)
     config: EnvironmentConfig,

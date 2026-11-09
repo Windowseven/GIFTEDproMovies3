@@ -2,9 +2,10 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Bell, Search, CheckCircle2, AlertTriangle, Info, Menu, X, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, LogOut, ChevronDown } from "lucide-react";
 import { AdminBrandLogo } from "./AdminBrandLogo";
 import { useAuth } from "@/context/AuthContext";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface AdminHeaderProps {
   onToggleMobileMenu?: () => void;
@@ -16,7 +17,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   isMobileMenuOpen = false,
 }) => {
   const { user, logout } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
@@ -57,95 +57,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
         {/* Right: Quick Notifications & Admin Profile */}
         <div className="flex items-center gap-3">
-          {/* Notification Button & Popover */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2.5 rounded-xl bg-[#111318] border border-[#262932] text-[#A6A8B0] hover:text-white hover:border-[#70737C]/40 transition-all"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#B11226] text-[9px] font-bold text-white shadow-sm">
-                3
-              </span>
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-84 sm:w-96 rounded-2xl bg-[#181A21] border border-[#262932] shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="flex items-center justify-between pb-3 border-b border-[#262932]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5]">
-                      Platform Notifications
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#B11226]/20 text-[#B11226] font-bold">
-                      3 New
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowNotifications(false)}
-                    className="text-[11px] text-[#A6A8B0] hover:text-white transition-colors"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-
-                <div className="mt-3 space-y-2.5">
-                  <Link
-                    href="/admin/movies"
-                    onClick={() => setShowNotifications(false)}
-                    className="block p-3 rounded-xl bg-[#111318] border border-[#262932] hover:border-[#D6A84F]/40 transition-colors"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <AlertTriangle className="w-4 h-4 text-[#D6A84F] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-white">4 Movies Awaiting Publishing Review</p>
-                        <p className="text-[11px] text-[#A6A8B0] mt-0.5">
-                          Media processing finished by Media Team. Awaiting final commercial approval.
-                        </p>
-                        <span className="text-[10px] text-[#70737C] font-mono mt-1 block">15 mins ago</span>
-                      </div>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/admin/users"
-                    onClick={() => setShowNotifications(false)}
-                    className="block p-3 rounded-xl bg-[#111318] border border-[#262932] hover:border-[#3B82F6]/40 transition-colors"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <Info className="w-4 h-4 text-[#3B82F6] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-white">18 Customer Passes Expiring</p>
-                        <p className="text-[11px] text-[#A6A8B0] mt-0.5">
-                          VIP customer passes reaching 24-hour expiration threshold. Renewal dispatched.
-                        </p>
-                        <span className="text-[10px] text-[#70737C] font-mono mt-1 block">3 hours ago</span>
-                      </div>
-                    </div>
-                  </Link>
-
-                  <Link
-                    href="/admin/orders"
-                    onClick={() => setShowNotifications(false)}
-                    className="block p-3 rounded-xl bg-[#111318] border border-[#262932] hover:border-[#10B981]/40 transition-colors"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-white">Daily Sales Target Achieved (84.2%)</p>
-                        <p className="text-[11px] text-[#A6A8B0] mt-0.5">
-                          Commercial sales reached TZS 4,850,000 for today with 99.1% payment success rate.
-                        </p>
-                        <span className="text-[10px] text-[#70737C] font-mono mt-1 block">5 hours ago</span>
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Real-time Notification Bell */}
+          <NotificationBell />
 
           {/* Admin Profile */}
           <div className="relative pl-3 border-l border-[#262932]">

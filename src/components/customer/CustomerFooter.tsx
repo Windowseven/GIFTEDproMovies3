@@ -7,8 +7,8 @@ export function CustomerFooter() {
   return (
     <footer className="bg-[#050608] border-t border-[#262932] pt-14 pb-10 text-[#A6A8B0] text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        {/* Main 4-column Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10">
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-10">
           {/* Brand & Manifesto */}
           <div className="lg:col-span-2 space-y-4">
             <CustomerBrandLogo showSubtitle={true} />
@@ -74,18 +74,18 @@ export function CustomerFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/djs/dj-afro-amigo" className="hover:text-white transition-colors">
-                  DJ Afro Amigo
-                </Link>
-              </li>
-              <li>
-                <Link href="/djs/dj-murphy" className="hover:text-white transition-colors">
-                  DJ Murphy
+                <Link href="/djs/dj-afro" className="hover:text-white transition-colors">
+                  DJ Afro
                 </Link>
               </li>
               <li>
                 <Link href="/djs/dj-smith" className="hover:text-white transition-colors">
                   DJ Smith
+                </Link>
+              </li>
+              <li>
+                <Link href="/djs/dj-murphy" className="hover:text-white transition-colors">
+                  DJ Murphy
                 </Link>
               </li>
               <li>
@@ -96,40 +96,82 @@ export function CustomerFooter() {
             </ul>
           </div>
 
-          {/* Column 3: Customer Support & Mobile Money */}
+          {/* Column 3: Account & Library */}
           <div className="space-y-3">
             <h4 className="text-white font-bold text-xs uppercase tracking-wider font-mono">
-              Supported Telcos
+              Your Account
             </h4>
             <ul className="space-y-2 text-xs">
-              <li className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span>M-Pesa (Vodacom)</span>
+              <li>
+                <Link href="/library" className="hover:text-white transition-colors">
+                  My Library &amp; Passes
+                </Link>
               </li>
-              <li className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Tigo Pesa (Yas)</span>
+              <li>
+                <Link href="/account/orders" className="hover:text-white transition-colors">
+                  Orders &amp; Receipts
+                </Link>
               </li>
-              <li className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-600" />
-                <span>Airtel Money</span>
+              <li>
+                <Link href="/account/devices" className="hover:text-white transition-colors">
+                  Registered Devices
+                </Link>
               </li>
-              <li className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-orange-500" />
-                <span>Halopesa</span>
+              <li>
+                <Link href="/account/security" className="hover:text-white transition-colors">
+                  Security Settings
+                </Link>
               </li>
-              <li className="pt-1">
-                <Link href="/library" className="hover:text-white transition-colors underline decoration-dotted">
-                  My Downloads &amp; Passes
+            </ul>
+          </div>
+
+          {/* Column 4: Legal & Compliance */}
+          <div className="space-y-3">
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider font-mono">
+              Legal &amp; Privacy
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link href="/terms" className="hover:text-white transition-colors">
+                  Terms of Service (18+)
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="hover:text-white transition-colors">
+                  Privacy Policy (PDPA)
+                </Link>
+              </li>
+              <li>
+                <Link href="/cookies" className="hover:text-white transition-colors">
+                  Cookie Notice
+                </Link>
+              </li>
+              <li>
+                <Link href="/refunds" className="hover:text-white transition-colors">
+                  Refund &amp; Cancellation
+                </Link>
+              </li>
+              <li>
+                <Link href="/account-deletion" className="hover:text-white transition-colors text-gray-400">
+                  Data Erasure Rights
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-white transition-colors">
+                  Support &amp; Inquiries
                 </Link>
               </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Discreet Staff Operations link */}
-        <div className="pt-8 border-t border-[#262932]/70 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-gray-500">
-          <p>© 2026 GIFTEDproMovies. All rights reserved. 100% Licensed Entertainment.</p>
+        {/* Bottom Bar: Copyright, Legal Links & Staff Operations link */}
+        <div className="pt-8 border-t border-[#262932]/70 flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-gray-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p>© 2026 GIFTEDproMovies. All rights reserved. 100% Licensed Entertainment.</p>
+            <span className="hidden md:inline text-gray-700">•</span>
+            <span className="text-gray-400 font-mono text-[10px]">Strictly 18+ Platform</span>
+          </div>
 
           {/* Staff Switcher */}
           <div className="flex items-center gap-4 text-xs">

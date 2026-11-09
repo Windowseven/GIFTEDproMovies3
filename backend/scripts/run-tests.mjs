@@ -35,6 +35,7 @@ const databaseTestFiles = new Set([
   "media-supersession-safeguards.test.js",
   "download-authorization.integration.test.js",
   "device-limits.integration.test.js",
+  "phase7-backend-master-e2e.integration.test.js",
 ]);
 
 
